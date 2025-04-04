@@ -47,6 +47,24 @@
 
         <h2>Goals and Deliverables</h2>
 		<!-- TODO: ADD GOALS and DELIVERABLES -->
+		 <ul>
+			<li>(1) What We Plan to Deliver</li><br>
+			<!-- describe what you believe you must accomplish to have a successful project and achieve the grade you expect (i.e. your baseline plan -->
+			We plan to have a framework for rendering dynamic 3D objects in real-time using neural cellular automata. Our baseline plan is that we have can present a cellular automata of a 3D mesh that can be 
+			reconstructed when user destroys part of the mesh. This reconstruction process will be handled by a small neural network that we train. Note that this is different from a deterministic reconstruction of a given
+			3D object since neural cellular automata reconstructs the missing parts of an object by iterating only on a local part of the object. Also, we plan to speed up the reconstruction process by optimizing model inference through
+			quantization and parallel execution. Overall, our goal is to show that this framework is more flexible and faster than traditional deterministic 3D reconstruction methods. <br>
+			<br>
+			With this goal in mind, some metrics we can record to test the generalizability and performance of our model is to test the following:
+			<ul>
+				<li>Reconstruction Accuracy(Mean Squared Error): Plot Reconstruction accuracy(MSE) vs. voxel grid size(num of voxels)</li>
+				<li>Reconstruction Speed(s): Plot reconstruction speed(s) vs. voxel grid size(num of voxels)</li>
+				<li>Robustness to Corrupted Data: Plot Reconstruction accuracy(MSE) vs. Percentage of voxels destroyed(%), for a fixed size voxel grid size</li>
+			</ul>
+			<br>
+			<li>(2) What We Hope to Deliver</li><br>
+			TODO
+		 </ul>
 
         <h2>Schedule</h2>
 		
@@ -105,6 +123,12 @@
         <h2>Resources</h2>
 		<a href="https://distill.pub/2020/growing-ca/#experiment-3">distill.pub/2020/growing-ca/#experiment-3</a>
 		<!-- TODO: ADD MORE RESOURCES -->
+		 <br><br>
+		 GPU Resources
+		 <ul>
+			<li>2 x NVIDIA 2080Ti 11GB</li>
+			<li>1 x NVIDIA A6000 48GB (only if more compute is necessary)</li>
+		 </ul>
 		</div>
 	</body>
 </html>

@@ -28,7 +28,7 @@
 	<body>
 		<div class="container">
 		<h1>CS184/284A Spring Project Proposal</h1>
-		<div style="text-align: center;">Names: </div>
+		<div style="text-align: center;">Names: Annabel Ng, George Rickus, Henry Ko, Samarth Jajoo</div>
 
 		<br>
 		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
@@ -41,14 +41,70 @@
 		Our implementation will convert an input triangle mesh into a voxel representation and train a convolutional neural network that learns to create/regenerate this voxel representation from minimal/damaged voxel grids. 
 		We plan to build on past work by making the process more efficient through approaches like model quantization and directly mapping model outputs to GPU shaders for improved efficiency. 
 
+
 		<h2>Problem Description</h2>
-		
+		<!-- TODO: ADD PROBLEM DESCRIPTION -->
 
         <h2>Goals and Deliverables</h2>
+		<!-- TODO: ADD GOALS and DELIVERABLES -->
 
         <h2>Schedule</h2>
+		
+		<h3>Week 1: Voxel Generation and Model Training</h3>
+		<h4>VOXEL GENERATION</h4>
+		<ul>
+			<li>Flood Fill Algorithm: Either implement flood fill on our own to convert a 3D mesh to a voxel grid (by flooding the region outside of the mesh) or use existing python libraries that can do this for us</li>
+			<li>Voxel Coloring: Color voxels by casting rays from the camera to random positions in the voxel and use the UV-barycentric interpolation to aggregate the sample colors to generate a single voxel color value (Pytorch3D seems to have what we need for raycasting in this part or we can reimplement this on our own). For non-surface voxels, we can color it with noise that we can convert to colors like pink to represent the internal flesh of say a 3D lizard.</li>
+		</ul>
+		<h4>MODEL TRAINING</h4>
+		<ul>
+			<li>Create a scheme for artificially damaging groud truth voxel grid to use in training data alongside single "seed" voxel training to increase model robustness</li>
+			<li>We train a small 2 to 3 layer CNN in PyTorch using 3D convolutions to learn the cellular automata update rule from the surrounding 26 voxels + itself (3x3x3 Conv) for a single 3D object</li>
+			<li>Expirement with Model Quantization to improve speed down the line and test various architectures to see how small we can make the model while maintaining performance.</li> 
+		</ul> 
+		
+		<h3>Week 2: Voxel Rendering, Shading, and Updates</h3>
+		<h4>VOXEL RENDERING</h4>
+		<ul>
+			<li>Create an efficient strategy for tracking all voxels on/near surface whose existence/color may be changed</li>
+			<li>We generate cube mesh instances for every colored voxel on the surface of a given time-step tracking on GPU directly with OpenGL, only rendering those using shader that are not occluded, but tracking the colors of all voxels nonetheless.</li>
+		</ul>
+		<h4>DYNAMIC VOXEL SHADING</h4>
+		<ul>
+			<li>Use the TorchLib C++ package to load in our CNN model trained in python and at every timestep, run inference on all surface voxels</li>
+			<li>Shade the Cube instances using GLSL with the colors being part of the model output (i.e. last 3 values). We can directly bind this portion of the inference output to the cube's shader for efficiency (keep everything directly on GPU)</li>
+		</ul>
+		
+		<h3>Week 3: User-controlled Voxel Destruction, Voxel Object Regeneration, and Fine-Tuning</h3>
+		<h4>USER VOXEL DESTRUCTION / REGENERATION</h4>
+		<ul>
+			<li>When user clicks with cursor, we cast a ray from cam through the cursor to find intersection coordinates with the voxel object.</li>
+			<li>Delete existing cubes in voxel object based on intersection coordinate in a brush style(cylindrical) pattern</li>
+			<li>Experiment with other deletion algorithms (i.e. maybe leave some flesh tendrils with a random probability) to make regeneration look more appealing</li>
+		</ul>
+		<h4>FINE-TUNING</h4>
+		<ul>
+			<li>Ensure all previous steps are working well</li>
+			<li>Further experiment with model architecture and try to make more optimizations / parallelize more</li>
+			<li>Experiment with other more realistic voxel coloring schemes</li>
+		</ul>
+
+		<h3>Week 4: Last-second Fine-tuning and Presentation/Demo creation</h3>
+		<h4>FINE-TUNING (as time permits)</h4>
+		<ul>
+			<li>Ensure all previous steps are working as well as possible</li>
+		</ul>
+		<h4>PRESENTATION / DEMO</h4>
+		<ul>
+			<li>Build the presentation and record videos of any demos</li>
+			<li>Record Final video presentation</li>
+			<li>Build project website</li>
+		</ul>
+
 
         <h2>Resources</h2>
+		<a href="https://distill.pub/2020/growing-ca/#experiment-3">distill.pub/2020/growing-ca/#experiment-3</a>
+		<!-- TODO: ADD MORE RESOURCES -->
 		</div>
 	</body>
 </html>

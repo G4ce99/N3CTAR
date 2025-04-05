@@ -44,12 +44,15 @@
 
 		<h2>Problem Description</h2>
 		<!-- TODO: ADD PROBLEM DESCRIPTION -->
-		Neural cellular automata (NCAs) models learn to simulate complex dynamic systems by iteratively updating the state of a grid or lattice based on local rules. This allows them to capture emergent behaviors and patterns that arise from simple interactions between neighboring cells, making them suitable for tasks such as image generation, texture synthesis, and even simulating physical phenomena. However, traditional NCAs often operate on 2D grids, limiting their application to flat images or textures. Most efforts at 3D NCAs have focused on extending the 2D cellular automata framework to  simple 3D shapes like spheres, cubes, or other geometries, but these approaches don't allow for flexibility of dynamically regenerating complex 3D objects that go beyond geometric shapes like seen in this <a href="https://distill.pub/2020/growing-ca/#experiment-3">2D NCA simulation of Growing Neural Cellular Automata</a>. 
+		Neural cellular automata (NCAs) models learn to simulate complex dynamic systems by iteratively updating the state of a grid based on local rules. This allows them to capture emergent behaviors that arise from simple interactions between neighboring cells, making them suitable for tasks such as image generation, texture synthesis, and even simulating physical phenomena. However, traditional NCAs often operate on 2D grids, limiting their application to flat images or textures. Most efforts at 3D NCAs have focused on extending the 2D cellular automata framework to  simple 3D shapes like spheres, cubes, or other geometries, but these approaches don't allow for flexibility of dynamically regenerating complex 3D objects that go beyond geometric shapes like seen in this <a href="https://distill.pub/2020/growing-ca/#experiment-3">2D NCA simulation of Growing Neural Cellular Automata</a>. 
 		<br><br>
+
+		This problem is relevant because NCAs are useful for studying biological pattern formation and growth patterns, and extending them to a more complex 3D simulation opens up new possibilities for simulating more complex biological processes. It could also allow for cool 3D effects in games and interactive applications, such as destructible environments or dynamic object regeneration. The main challenge of this project lies in efficiently representing, rendering, and regenerating these 3D NCAs while maintaining real-time performance, especially when dealing with complex geometries and dynamic updates, and it'll be interesting to train and integrate the NCA model with GPU rendering techniques to achieve this.
 		
-		Our project aims to address three primary problems:
+		<br><br>
+		Our project will tackle:
 		<ol>
-			<li>Generating voxel representations of non-trivial 3D objects (going beyond a sphere or cube) with NCAs, such as animals or complex structures, from a given triangle mesh. This involves converting the mesh into a voxel grid while preserving the object's shape and details and training a neural network to learn the cellular automata update rules for this voxel grid. </li>
+			<li>Generating voxel representations of non-trivial 3D objects with NCAs, such as animals or complex structures, from a given triangle mesh. This involves converting the mesh into a voxel grid while preserving the object's shape and details and training a neural network to learn the cellular automata update rules for this voxel grid. </li>
 			<li>Enabling real-time rendering of these voxel representations while allowing for dynamic updates (i.e. user-controlled destruction and regeneration of the 3D object). </li>
 			<li>Improving the efficiency of the rendering process by optimizing model inference and shading directly on the GPU.</li>
 		</ol>
@@ -72,7 +75,7 @@
 			<br>
 			<li>(2) What We Hope to Deliver</li><br>
 			We'd like to speed up the reconstruction process by optimizing model inference through
-			quantization and parallel execution. We're also hoping to spend time in making the reconstruction fo a damaged mesh look more "organic": for example, adding "flesh" to the inside of the mesh, which is exposed upon damage to it, and eventually rebuilt and transformed back to "skin".
+			quantization and parallel execution. We're also hoping to spend time in making the reconstruction fo a damaged mesh look more "organic": for example, adding pink-colored " to the inside of the mesh, which is exposed upon damage to it, and eventually rebuilt and transformed back to "skin".
 		 </ul>
 
         <h2>Schedule</h2>

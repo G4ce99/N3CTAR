@@ -31,10 +31,10 @@
 		<div style="text-align: center;">Names: Annabel Ng, George Rickus, Henry Ko, Samarth Jajoo</div>
 
 		<br>
-		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+		Link to webpage: <a href="https://g4ce99.github.io/N3CTAR/">g4ce99.github.io/N3CTAR/</a>
 
 		<br>
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+		Link to GitHub repository: <a href="https://github.com/G4ce99/N3CTAR5">github.com/G4ce99/N3CTAR</a>
 
 		<h2>N3CTAR: Neural 3D Cellular Tessellated Automata Rendering</h2>
 		For our final project N3CTAR, we will be creating a generalizable framework for rendering dynamic 3D objects in real-time using neural cellular automata. 
@@ -44,7 +44,16 @@
 
 		<h2>Problem Description</h2>
 		<!-- TODO: ADD PROBLEM DESCRIPTION -->
-
+		Neural cellular automata (NCAs) models learn to simulate complex dynamic systems by iteratively updating the state of a grid or lattice based on local rules. This allows them to capture emergent behaviors and patterns that arise from simple interactions between neighboring cells, making them suitable for tasks such as image generation, texture synthesis, and even simulating physical phenomena. However, traditional NCAs often operate on 2D grids, limiting their application to flat images or textures. Most efforts at 3D NCAs have focused on extending the 2D cellular automata framework to  simple 3D shapes like spheres, cubes, or other geometries, but these approaches don't allow for flexibility of dynamically regenerating complex 3D objects that go beyond geometric shapes like seen in this <a href="https://distill.pub/2020/growing-ca/#experiment-3">2D NCA simulation of Growing Neural Cellular Automata</a>. 
+		<br><br>
+		
+		Our project aims to address three primary problems:
+		<ol>
+			<li>Generating voxel representations of non-trivial 3D objects (going beyond a sphere or cube) with NCAs, such as animals or complex structures, from a given triangle mesh. This involves converting the mesh into a voxel grid while preserving the object's shape and details and training a neural network to learn the cellular automata update rules for this voxel grid. </li>
+			<li>Enabling real-time rendering of these voxel representations while allowing for dynamic updates (i.e. user-controlled destruction and regeneration of the 3D object). </li>
+			<li>Improving the efficiency of the rendering process by optimizing model inference and shading directly on the GPU.</li>
+		</ol>
+	
         <h2>Goals and Deliverables</h2>
 		<!-- TODO: ADD GOALS and DELIVERABLES -->
 		 <ul>

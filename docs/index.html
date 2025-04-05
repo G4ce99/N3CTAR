@@ -61,8 +61,7 @@
 			<!-- describe what you believe you must accomplish to have a successful project and achieve the grade you expect (i.e. your baseline plan -->
 			We plan to have a framework for rendering dynamic 3D objects in real-time using neural cellular automata. Our baseline plan is that we have can present a cellular automata of a 3D mesh that can be 
 			reconstructed when user destroys part of the mesh. This reconstruction process will be handled by a small neural network that we train. Note that this is different from a deterministic reconstruction of a given
-			3D object since neural cellular automata reconstructs the missing parts of an object by iterating only on a local part of the object. Also, we plan to speed up the reconstruction process by optimizing model inference through
-			quantization and parallel execution. Overall, our goal is to show that this framework is more flexible and faster than traditional deterministic 3D reconstruction methods. <br>
+			3D object since neural cellular automata reconstructs the missing parts of an object by iterating only on a local part of the object.  <br>
 			<br>
 			With this goal in mind, some metrics we can record to test the generalizability and performance of our model is to test the following:
 			<ul>
@@ -72,7 +71,8 @@
 			</ul>
 			<br>
 			<li>(2) What We Hope to Deliver</li><br>
-			TODO
+			We'd like to speed up the reconstruction process by optimizing model inference through
+			quantization and parallel execution. We're also hoping to spend time in making the reconstruction fo a damaged mesh look more "organic": for example, adding "flesh" to the inside of the mesh, which is exposed upon damage to it, and eventually rebuilt and transformed back to "skin".
 		 </ul>
 
         <h2>Schedule</h2>

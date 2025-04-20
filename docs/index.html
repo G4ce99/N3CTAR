@@ -63,7 +63,8 @@
     
 
     <h3>2. 3D Cellular Automata Neural Network</h3>
-      [TODO: include description about model]
+    Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
+	The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
       <br><br>
       Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
       higher-resolution voxels.

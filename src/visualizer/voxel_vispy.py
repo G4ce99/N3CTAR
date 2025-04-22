@@ -6,14 +6,14 @@ import sys
 from vispy.color import Color
 from vispy.geometry import create_box
 from vispy.scene.visuals import Mesh
-
+import signal
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from model.NCA import NCA
 
 # ==== Model + Setup ====
-model_name = "mario_epochs_1000"
+model_name = "mario_curriculum_epochs_2000"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16
@@ -63,6 +63,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # VisPy 3D setup
         self.view = self.canvas.central_widget.add_view()
+        center = env_dim // 2
+
+        self.view.camera.center = (center, center, center)
+        self.view.camera.set_range(x=(0, env_dim), y=(0, env_dim), z=(0, env_dim))
+        self.view.camera.distance = env_dim * 10
         self.view.camera = scene.cameras.TurntableCamera(fov=60)
         # self.scatter = scene.visuals.Markers(parent=self.view.scene)
         # self.scatter.antialias = 0
@@ -98,6 +103,8 @@ class MainWindow(QtWidgets.QMainWindow):
         coords = np.argwhere(alive)
         colors = rgba[alive][..., :3]
         colors = np.clip(colors, 0, 1)
+
+        # old code for scatter point cloud 
         # if len(coords) > 0:
         #     self.scatter.set_data(coords, face_color=colors, size=10)
         # else:
@@ -134,7 +141,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.mesh = Mesh(vertices=V, faces=F, vertex_colors=C, shading='flat', parent=self.view.scene)
 
 
-
     def step_model(self):
         global x, eval_iter
         with torch.no_grad():
@@ -162,6 +168,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
 # ==== Run the Qt app ====
 if __name__ == '__main__':
+    def clean_exit(*args):
+        print("🧹 Cleaning up...")
+        QtWidgets.QApplication.quit()
+        sys.exit()
+
+    # Register cleanup signals
+    signal.signal(signal.SIGINT, clean_exit)  # Handle Ctrl+C
+    signal.signal(signal.SIGTERM, clean_exit)  # Handle termination signals
+
     app.use_app('pyqt5')  # Use Qt backend
     qt_app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()

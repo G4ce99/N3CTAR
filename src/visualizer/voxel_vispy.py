@@ -4,6 +4,8 @@ import torch
 import numpy as np
 import sys
 from vispy.color import Color
+from vispy.geometry import create_box
+from vispy.scene.visuals import Mesh
 
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -62,8 +64,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # VisPy 3D setup
         self.view = self.canvas.central_widget.add_view()
         self.view.camera = scene.cameras.TurntableCamera(fov=60)
-        self.scatter = scene.visuals.Markers(parent=self.view.scene)
-        self.scatter.antialias = 0
+        # self.scatter = scene.visuals.Markers(parent=self.view.scene)
+        # self.scatter.antialias = 0
+        self.mesh = None
         #self.voxel_group = scene.Node(parent=self.view.scene)
 
         # Buttons
@@ -95,28 +98,42 @@ class MainWindow(QtWidgets.QMainWindow):
         coords = np.argwhere(alive)
         colors = rgba[alive][..., :3]
         colors = np.clip(colors, 0, 1)
-        if len(coords) > 0:
-            self.scatter.set_data(coords, face_color=colors, size=10)
-        else:
-            self.scatter.set_data(np.zeros((0, 3)), face_color='white', size=10)
-        # Clear previous cubes
-        # for child in list(self.voxel_group.children):
-        #     child.parent = None  # Removes it from the scene
+        # if len(coords) > 0:
+        #     self.scatter.set_data(coords, face_color=colors, size=10)
+        # else:
+        #     self.scatter.set_data(np.zeros((0, 3)), face_color='white', size=10)
+        if hasattr(self, "mesh") and self.mesh is not None:
+            self.mesh.parent = None
 
-        # rgba = voxels.permute(1, 2, 3, 0).detach().cpu().numpy()
-        # alive = rgba[..., 3] > model.alive_thres
-        # coords = np.argwhere(alive)
-        # colors = rgba[alive][..., :3]
-        # colors = np.clip(colors, 0, 1)
+        if len(coords) == 0:
+            return
 
-        # box_size = 0.95  # Adjust for spacing between cubes
+        # Create a unit cube (centered at 0)
+        box_vertices, box_faces, _ = create_box(width=1.0, height=1.0, depth=1.0)
 
-        # for pos, col in zip(coords, colors):
-        #     cube = scene.visuals.Box(
-        #         width=box_size, height=box_size, depth=box_size,
-        #         color=Color(col), edge_color=None, parent=self.voxel_group
-        #     )
-        #     cube.transform = scene.transforms.STTransform(translate=pos)
+        all_vertices = []
+        all_faces = []
+        all_colors = []
+
+        for i, (pos, color) in enumerate(zip(coords, colors)):
+            # Translate cube to voxel location
+            translated_vertices = box_vertices['position'] + pos
+            all_vertices.append(translated_vertices)
+
+            # Offset faces by vertex count
+            all_faces.append(box_faces + i * box_vertices.shape[0])
+
+            # Repeat color for each face vertex
+            all_colors.append(np.tile(color, (box_vertices.shape[0], 1)))
+
+        # Stack all cube geometries into one mesh
+        V = np.vstack(all_vertices)
+        F = np.vstack(all_faces)
+        C = np.vstack(all_colors)
+
+        self.mesh = Mesh(vertices=V, faces=F, vertex_colors=C, shading='flat', parent=self.view.scene)
+
+
 
     def step_model(self):
         global x, eval_iter

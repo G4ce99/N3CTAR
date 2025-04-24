@@ -4,7 +4,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import argparse
 from vedo import *
-from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_dilation, binary_closing
 import datetime
 
 def load_ply(ply_path):
@@ -140,12 +140,14 @@ def interactive_voxel_viewer(voxel_grid, interior_mask):
     # Start the interactive viewer
     plt.interactive()
 
-
 """"
 Function to flood fill the inside of the voxel grid with a specified color.
 """
 def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
     filled = np.any(voxel_grid > 0, axis=-1)
+
+    # fill holes in the mesh, if any exist (e.g. mario was not water tight)
+    filled = binary_closing(filled, structure=np.ones((3, 3, 3)))
 
     boundary = np.zeros_like(filled, dtype=bool)
     boundary[0, :, :] = True
@@ -169,6 +171,28 @@ def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
 
     return voxel_grid, interior
 
+def is_voxel_watertight(filled):
+    # given filled from fill_inside_voxels, output True if watertight and False otherwise
+    
+    outside = np.zeros_like(filled, dtype=bool)
+    outside[0, :, :] = ~filled[0, :, :]
+    outside[-1, :, :] = ~filled[-1, :, :]
+    outside[:, 0, :] = ~filled[:, 0, :]
+    outside[:, -1, :] = ~filled[:, -1, :]
+    outside[:, :, 0] = ~filled[:, :, 0]
+    outside[:, :, -1] = ~filled[:, :, -1]
+
+    structure = np.ones((3, 3, 3), dtype=bool)
+
+    for _ in range(filled.shape[0] * 2):
+        new_outside = binary_dilation(outside, structure) & ~filled & ~outside
+        if not new_outside.any():
+            break
+        outside |= new_outside
+
+    interior = ~filled & ~outside
+    return interior.any()
+    
 def save_voxel_grid_as_points(voxel_grid, output_path):
     """
     Save the voxel grid in the format [x, y, z, r, g, b].

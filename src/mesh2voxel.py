@@ -146,8 +146,9 @@ Function to flood fill the inside of the voxel grid with a specified color.
 def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
     filled = np.any(voxel_grid > 0, axis=-1)
 
-    # fill holes in the mesh, if any exist (e.g. mario was not water tight)
-    filled = binary_closing(filled, structure=np.ones((3, 3, 3)))
+    if not is_voxel_watertight(filled):
+        # fill holes in the mesh, if any exist (e.g. mario was not water tight)
+        filled = binary_closing(filled, structure=np.ones((3, 3, 3)))
 
     boundary = np.zeros_like(filled, dtype=bool)
     boundary[0, :, :] = True
@@ -173,7 +174,8 @@ def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
 
 def is_voxel_watertight(filled):
     # given filled from fill_inside_voxels, output True if watertight and False otherwise
-    
+    # NOTE: this is a util function to check if the voxel grid is watertight
+
     outside = np.zeros_like(filled, dtype=bool)
     outside[0, :, :] = ~filled[0, :, :]
     outside[-1, :, :] = ~filled[-1, :, :]

@@ -22,10 +22,13 @@ class NCA(nn.Module):
         self.alive_thres = alive_thres
         self.overgrowth_to_undergrowth_penalty = overgrowth_to_undergrowth_penalty
 
-        self.seed = generate_seed(n_channels, env_dim).to(device)
+        self.env_dim = env_dim
+        self.learn_seed = learn_seed
+        self.seed = generate_seed(n_channels, env_dim)
         if learn_seed:
-            self.seed[4:, env_dim//2, env_dim//2, env_dim//2] = torch.randn(n_channels-4) * seed_std
-            self.seed = nn.Parameter(self.seed)
+            self.seed_center = nn.Parameter(torch.empty(n_channels-4)).to(device)
+            nn.init.kaiming_normal_(self.seed_center.unsqueeze(1), mode='fan_in', nonlinearity='relu')
+        self.seed = self.seed.to(device)
 
         # Perception layer
         self.perceive = nn.Conv3d(n_channels, 3*n_channels, kernel_size=3, padding=1)
@@ -35,8 +38,17 @@ class NCA(nn.Module):
         self.process1 = nn.Conv3d(3*n_channels, 2*n_channels, kernel_size=1)
         self.process2 = nn.Conv3d(2*n_channels, n_channels, kernel_size=1)
     
-    def forward(self, x, use_soft_living_mask=False):
-        update_mask = (torch.rand(x[:, :1].shape, dtype=torch.float32).to(device) <= self.update_prob).float()
+    def get_seed(self):
+        if self.learn_seed:
+            seed = self.seed.clone()
+            seed[4:, self.env_dim//2, self.env_dim//2, self.env_dim//2] = self.seed_center
+            return seed
+        else:
+            return self.seed
+
+    def forward(self, x, alive, use_soft_living_mask=False):
+        nbrs = F.max_pool3d(alive, kernel_size=3, stride=1, padding=1)
+        update_mask = ((torch.rand(x[:, :1].shape, dtype=torch.float32).to(device) <= self.update_prob) * (nbrs>0)).float()
         
         y = self.perceive(x)
         y = self.norm1(y)
@@ -56,16 +68,19 @@ class NCA(nn.Module):
         else:
             living_mask = (F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) > self.alive_thres).float()
             
-        return x * living_mask
+        return x * living_mask, living_mask
     
-    def get_loss(self, x, target_vox):
+    def get_loss(self, x, target_vox, prev_x, stability_factor):
         target = torch.tile(target_vox, (x.shape[0], 1, 1, 1, 1))
         x_rgba = x[:, :4]
+        prev_x_rgba = prev_x[:, :4]
 
         x_living_mask = (x_rgba[:, 3:4] > self.alive_thres).float()
         target_living_mask = (target[:, 3:4] > self.alive_thres).float()
+        zeros = torch.zeros(target.shape).to(device)
 
         undergrowth_loss = F.mse_loss(x_rgba * target_living_mask, target * target_living_mask) 
-        overgrowth_loss = self.overgrowth_to_undergrowth_penalty * F.mse_loss(x_rgba * (1.-target_living_mask) * x_living_mask, torch.zeros(target.shape).to(device))
-        loss = undergrowth_loss + overgrowth_loss
-        return loss, undergrowth_loss, overgrowth_loss
+        overgrowth_loss = self.overgrowth_to_undergrowth_penalty * F.mse_loss(x_rgba * (1.-target_living_mask) * x_living_mask, zeros)
+        stability_loss = stability_factor * F.mse_loss(x_rgba-prev_x_rgba, zeros)
+        loss = undergrowth_loss + overgrowth_loss + stability_loss
+        return loss, undergrowth_loss, overgrowth_loss, stability_loss

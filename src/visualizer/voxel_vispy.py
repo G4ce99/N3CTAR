@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from model.NCA import NCA
 
 # ==== Model + Setup ====
-model_name = "mario_curriculum3wide_epochs_2400"
+model_name = "mario_curriculum4_over1000_expand10_4000"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16
@@ -43,7 +43,8 @@ model.to(device)
 model.load_state_dict(torch.load(ckpt_path, map_location=device))
 model.eval()
 
-x = model.seed.unsqueeze(0)
+x = model.get_seed().unsqueeze(0)
+living_mask = (x[:,3:4] > model.alive_thres).float()
 eval_iter = 0
 
 # ==== PyQt Main Window ====
@@ -142,9 +143,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     def step_model(self):
-        global x, eval_iter
+        global x, living_mask, eval_iter
         with torch.no_grad():
-            x = model(x)
+            x, living_mask = model(x, living_mask)
             eval_iter += 1
             self.update_visual(torch.clamp(x[0, :4], 0., 1.))
             self.setWindowTitle(f"NCA Viewer - Iteration {eval_iter}")
@@ -160,8 +161,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.is_running = False
 
     def reset_simulation(self):
-        global x, eval_iter
-        x = model.seed.unsqueeze(0)
+        global x, living_mask, eval_iter
+        x = model.get_seed().unsqueeze(0)
+        living_mask = (x[:,3:4] > model.alive_thres).float()
         eval_iter = 0
         self.update_visual(torch.clamp(x[0, :4], 0., 1.))
         self.setWindowTitle("NCA Viewer - Reset")

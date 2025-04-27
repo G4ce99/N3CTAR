@@ -6,6 +6,14 @@ import argparse
 from vedo import *
 from scipy.ndimage import binary_dilation, binary_closing
 import datetime
+import signal
+import sys
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from collections import deque
+import plotly.graph_objects as go
+import scipy.ndimage
+
 
 def load_ply(ply_path):
     ply = PlyData.read(ply_path)
@@ -72,128 +80,183 @@ def voxelize_max_color_barycentric(verts, colors, faces, resolution=64):
 
     return voxel_grid
 
-
 def visualize_voxels(voxel_grid):
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
 
-    filled = np.any(voxel_grid > 0, axis=-1)
-    x, y, z = np.where(filled)
-    c = voxel_grid[x, y, z] / 255.0
+    filled = np.any(voxel_grid > 0, axis=-1)  # (X, Y, Z)
+    colors = voxel_grid / 255.0  # (X, Y, Z, 3) normalized to [0,1]
 
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(x, y, z, c=c, marker='s', s=20)
+
+    # Only pass color where voxels are filled
+    facecolors = np.zeros(filled.shape + (4,), dtype=np.float32)  # RGBA
+    facecolors[..., :3] = colors  # RGB
+    facecolors[..., 3] = filled  # Alpha = 1 where filled, 0 otherwise
+
+    ax.voxels(
+        filled,
+        facecolors=facecolors,
+    )
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     plt.title("Voxel Grid (MAX face color)")
     plt.tight_layout()
+    ax.mouse_init()
+
     plt.savefig("voxel_visualization.png", dpi=300)
-    plt.close()
+    plt.show()
 
-
-def interactive_voxel_viewer(voxel_grid, interior_mask):
+def interactive_voxel_viewer(voxel_grid):
     filled = np.any(voxel_grid > 0, axis=-1)
     x, y, z = np.where(filled)
     colors = voxel_grid[x, y, z]  # shape: (N, 3)
     coords = np.column_stack((x, y, z))
-    # Interior voxels
-    interior_x, interior_y, interior_z = np.where(interior_mask)
-    interior_colors = voxel_grid[interior_x, interior_y, interior_z]
-    interior_coords = np.column_stack((interior_x, interior_y, interior_z))
+
 
     # Create Points objects for all voxels and interior voxels
     all_pts = Points(coords, r=5) 
     all_pts.pointcolors = colors 
 
-    interior_pts = Points(interior_coords, r=5)
-    interior_pts.pointcolors = interior_colors
-
     # Create the Plotter
     plt = Plotter(axes=2)
     plt.add(all_pts)  # Start with all voxels visible
-    plt.show(interactive=True, title="Interactive Voxel Viewer (Press 'i' to toggle interior view)", viewup="z")
+    plt.show(interactive=True, title="Interactive Voxel Viewer", viewup="z")
 
     # State to track which view is active
     showing_all = True
 
-    # Toggle function
-    def toggle_visibility(event):
-        nonlocal showing_all
-        if event.keypress == "i":  # Toggle with the 'i' key
-            if showing_all:
-                plt.remove(all_pts)
-                plt.add(interior_pts)
-                plt.render()
-                print("[INFO] Showing interior voxels.")
-            else:
-                plt.remove(interior_pts)
-                plt.add(all_pts)
-                plt.render()
-                print("[INFO] Showing all voxels.")
-            showing_all = not showing_all
-
-    # Bind the toggle function to the Plotter
-    plt.add_callback("KeyPress", toggle_visibility)
-
     # Start the interactive viewer
     plt.interactive()
+    
+    plt.close()
+    return
+
+# function to just keep the largest connected component inside the voxel grid and remove the rest
+def clean_inside(inside_mask, min_size=10):
+    structure = np.ones((3,3,3), dtype=np.int32)  # 6-connectivity
+    labeled, num_features = scipy.ndimage.label(inside_mask, structure=structure)
+
+    print(f"Found {num_features} inside components.")
+
+    component_sizes = np.bincount(labeled.ravel())
+    component_sizes[0] = 0  # background
+
+    # Find components larger than min_size
+    valid_labels = np.where(component_sizes >= min_size)[0]
+    print(f"Keeping {len(valid_labels)} components larger than {min_size} voxels.")
+
+    # Create a mask for all valid components
+    cleaned = np.isin(labeled, valid_labels)
+
+    return cleaned
 
 """"
 Function to flood fill the inside of the voxel grid with a specified color.
 """
 def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
+    print(voxel_grid.shape)
+    original_colors = voxel_grid.copy()
+
     filled = np.any(voxel_grid > 0, axis=-1)
+    sealed_filled = scipy.ndimage.binary_dilation(filled, iterations=1)
 
-    if not is_voxel_watertight(filled):
-        # fill holes in the mesh, if any exist (e.g. mario was not water tight)
-        filled = binary_closing(filled, structure=np.ones((3, 3, 3)))
 
+    # create same shape as filled 
     boundary = np.zeros_like(filled, dtype=bool)
+
     boundary[0, :, :] = True
     boundary[-1, :, :] = True
+
     boundary[:, 0, :] = True
     boundary[:, -1, :] = True
+
     boundary[:, :, 0] = True
     boundary[:, :, -1] = True
 
-    outside = ~filled & boundary
-    structure = np.ones((3, 3, 3), dtype=bool)
+    # create empty array to store the flood fill
+    flood_fill = np.zeros_like(filled, dtype=bool)
 
-    for _ in range(voxel_grid.shape[0] * 2):
-        new_outside = binary_dilation(outside, structure) & ~filled & ~outside
-        if not new_outside.any():
-            break
-        outside |= new_outside
+    # use bfs to flood fill outside the voxel grid starting from a boundary point
+    queue = deque()
 
-    interior = ~filled & ~outside
-    voxel_grid[interior] = fill_color
+    # Enqueue all empty boundary voxels
+    X, Y, Z = filled.shape
+    for x in [0, X-1]:
+        for y in range(Y):
+            for z in range(Z):
+                if not sealed_filled[x, y, z]:
+                    queue.append((x, y, z))
+    for y in [0, Y-1]:
+        for x in range(X):
+            for z in range(Z):
+                if not sealed_filled[x, y, z]:
+                    queue.append((x, y, z))
+    for z in [0, Z-1]:
+        for x in range(X):
+            for y in range(Y):
+                if not sealed_filled[x, y, z]:
+                    queue.append((x, y, z))
 
-    return voxel_grid, interior
+    while queue:
+        x, y, z = queue.popleft()
 
-def is_voxel_watertight(filled):
-    # given filled from fill_inside_voxels, output True if watertight and False otherwise
-    # NOTE: this is a util function to check if the voxel grid is watertight
+        # Check bounds
+        if x < 0 or x >= sealed_filled.shape[0] or y < 0 or y >= sealed_filled.shape[1] or z < 0 or z >= sealed_filled.shape[2]:
+            continue
 
-    outside = np.zeros_like(filled, dtype=bool)
-    outside[0, :, :] = ~filled[0, :, :]
-    outside[-1, :, :] = ~filled[-1, :, :]
-    outside[:, 0, :] = ~filled[:, 0, :]
-    outside[:, -1, :] = ~filled[:, -1, :]
-    outside[:, :, 0] = ~filled[:, :, 0]
-    outside[:, :, -1] = ~filled[:, :, -1]
+        # If voxel is filled or already flood-filled, skip
+        if sealed_filled[x, y, z] or flood_fill[x, y, z]:
+            continue
 
-    structure = np.ones((3, 3, 3), dtype=bool)
+        # Otherwise, mark as flood filled
+        flood_fill[x, y, z] = True
 
-    for _ in range(filled.shape[0] * 2):
-        new_outside = binary_dilation(outside, structure) & ~filled & ~outside
-        if not new_outside.any():
-            break
-        outside |= new_outside
+        # Add neighbors
+        queue.extend([
+            (x-1, y, z), (x+1, y, z),
+            (x, y-1, z), (x, y+1, z),
+            (x, y, z-1), (x, y, z+1)
+        ])
+        
+    print(np.sum(flood_fill))
+    print(np.sum(filled))
 
-    interior = ~filled & ~outside
-    return interior.any()
+    # mark voxel grid as the inverse of flood fill
+    inside_filled = ~flood_fill & ~sealed_filled & ~filled
+    inside_filled = clean_inside(inside_filled, min_size=5)
+
+    print(np.sum(inside_filled))
+
+    # fill the inside of the voxel grid with the fill color
+    voxel_grid[inside_filled, :] = fill_color
+
+    return voxel_grid
+        
+
+# def is_voxel_watertight(filled):
+#     # given filled from fill_inside_voxels, output True if watertight and False otherwise
+#     # NOTE: this is a util function to check if the voxel grid is watertight
+
+#     outside = np.zeros_like(filled, dtype=bool)
+#     outside[0, :, :] = ~filled[0, :, :]
+#     outside[-1, :, :] = ~filled[-1, :, :]
+#     outside[:, 0, :] = ~filled[:, 0, :]
+#     outside[:, -1, :] = ~filled[:, -1, :]
+#     outside[:, :, 0] = ~filled[:, :, 0]
+#     outside[:, :, -1] = ~filled[:, :, -1]
+
+#     structure = np.ones((3, 3, 3), dtype=bool)
+
+#     for _ in range(filled.shape[0] * 2):
+#         new_outside = binary_dilation(outside, structure) & ~filled & ~outside
+#         if not new_outside.any():
+#             break
+#         outside |= new_outside
+
+#     interior = ~filled & ~outside
+#     return interior.any()
     
 def save_voxel_grid_as_points(voxel_grid, output_path):
     """
@@ -211,8 +274,16 @@ def save_voxel_grid_as_points(voxel_grid, output_path):
     np.save(output_path, points)
     print(f"[✓] Saved voxel grid as points to {output_path}")
 
+def clean_exit(*args):
+    print("\n[INFO] Exiting gracefully...")
+    sys.exit(0)
+
 # ---------- Main ----------
 if __name__ == "__main__":
+    # Register cleanup signals
+    signal.signal(signal.SIGINT, clean_exit)  # Handle Ctrl+C
+    signal.signal(signal.SIGTERM, clean_exit)  # Handle termination signals
+
     parser = argparse.ArgumentParser(description="Voxelize a PLY triangle mesh using MAX-face coloring")
     parser.add_argument('--input', '-i', required=True, help='Path to input .ply file')
     parser.add_argument('--output', '-o', default='output_voxel.npy', help='Path to save voxel .npy file')
@@ -224,14 +295,15 @@ if __name__ == "__main__":
 
     verts, colors, faces = load_ply(args.input)
     voxel_grid = voxelize_max_color_barycentric(verts, colors, faces, resolution=args.resolution)
-    voxel_grid, interior_mask = fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200))
+    voxel_grid = fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200))
 
     save_voxel_grid_as_points(voxel_grid, args.output)
-    # print(f"[✓] Saved voxel grid to {args.output}")
+    print(f"[✓] Saved voxel grid to {args.output}")
 
     if args.visualize:
         visualize_voxels(voxel_grid)
     
     if args.interactive:
-        interactive_voxel_viewer(voxel_grid, interior_mask)
+        interactive_voxel_viewer(voxel_grid)
+
         print("[✓] Opened interactive voxel viewer. Close the window to exit.")

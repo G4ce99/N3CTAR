@@ -134,7 +134,7 @@ def interactive_voxel_viewer(voxel_grid):
     return
 
 # function to just keep the largest connected component inside the voxel grid and remove the rest
-def clean_inside(inside_mask, min_size=100):
+def clean_inside(inside_mask, min_size=10):
     structure = np.ones((3,3,3), dtype=np.int32)  # 6-connectivity
     labeled, num_features = scipy.ndimage.label(inside_mask, structure=structure)
 
@@ -143,9 +143,12 @@ def clean_inside(inside_mask, min_size=100):
     component_sizes = np.bincount(labeled.ravel())
     component_sizes[0] = 0  # background
 
-    largest_label = component_sizes.argmax()
+    # Find components larger than min_size
+    valid_labels = np.where(component_sizes >= min_size)[0]
+    print(f"Keeping {len(valid_labels)} components larger than {min_size} voxels.")
 
-    cleaned = (labeled == largest_label)
+    # Create a mask for all valid components
+    cleaned = np.isin(labeled, valid_labels)
 
     return cleaned
 
@@ -222,7 +225,7 @@ def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
 
     # mark voxel grid as the inverse of flood fill
     inside_filled = ~flood_fill & ~sealed_filled & ~filled
-    inside_filled = clean_inside(inside_filled, min_size=20)
+    inside_filled = clean_inside(inside_filled, min_size=5)
 
     print(np.sum(inside_filled))
 

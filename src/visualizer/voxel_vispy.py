@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from model.NCA import NCA
 
 # ==== Model + Setup ====
-model_name = "mario_curriculum4_over1000_expand10_4000"
+model_name = "mario_curriculum4_damage_over1_13000"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16
@@ -82,13 +82,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.play_button = QtWidgets.QPushButton("▶ Play")
         self.pause_button = QtWidgets.QPushButton("⏸ Pause")
         self.reset_button = QtWidgets.QPushButton("🔄 Reset")
+        self.damage_button = QtWidgets.QPushButton("Rand Damage!")
         button_layout.addWidget(self.play_button)
         button_layout.addWidget(self.pause_button)
         button_layout.addWidget(self.reset_button)
+        button_layout.addWidget(self.damage_button)
 
         self.play_button.clicked.connect(self.start_simulation)
         self.pause_button.clicked.connect(self.stop_simulation)
         self.reset_button.clicked.connect(self.reset_simulation)
+        self.damage_button.clicked.connect(self.random_damage)
 
         # Timer for auto-update
         self.timer = QtCore.QTimer()
@@ -167,6 +170,15 @@ class MainWindow(QtWidgets.QMainWindow):
         eval_iter = 0
         self.update_visual(torch.clamp(x[0, :4], 0., 1.))
         self.setWindowTitle("NCA Viewer - Reset")
+    
+    def random_damage(self):
+        global x, living_mask
+        for i in range(np.random.randint(4, 12)):
+            damage_x = np.random.randint(0, 26)
+            damage_y = np.random.randint(0, 26)
+            damage_z = np.random.randint(0, 26)
+            x[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
+            living_mask[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
 
 # ==== Run the Qt app ====
 if __name__ == '__main__':

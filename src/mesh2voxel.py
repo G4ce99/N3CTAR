@@ -160,6 +160,9 @@ def fill_inside_voxels(voxel_grid, fill_color=(255, 200, 200)):
     original_colors = voxel_grid.copy()
 
     filled = np.any(voxel_grid > 0, axis=-1)
+    # dilation -> closing -> dilation
+    filled = scipy.ndimage.binary_dilation(filled, iterations=1)
+    filled = scipy.ndimage.binary_closing(filled, iterations=1)
     sealed_filled = scipy.ndimage.binary_dilation(filled, iterations=1)
 
 

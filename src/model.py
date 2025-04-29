@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from config import device
+# from config import device
 
 def generate_seed(n_channels, env_dim):
     seed = torch.zeros((n_channels, env_dim, env_dim, env_dim), dtype=torch.float32)
@@ -10,14 +10,15 @@ def generate_seed(n_channels, env_dim):
     return seed
 
 class NCA(nn.Module):
-    def __init__(self, n_channels, env_dim, learn_seed=True, seed_std=0.01, update_prob=0.5, alive_thres=0.1, overgrowth_to_undergrowth_penalty=1.0):
+    def __init__(self, n_channels, env_dim, device, learn_seed=True, seed_std=0.01, update_prob=0.5, alive_thres=0.1, overgrowth_to_undergrowth_penalty=1.0):
         super().__init__()
 
+        self.device = device
         self.update_prob = update_prob
         self.alive_thres = alive_thres
         self.overgrowth_to_undergrowth_penalty = overgrowth_to_undergrowth_penalty
 
-        self.seed = generate_seed(n_channels, env_dim).to(device)
+        self.seed = generate_seed(n_channels, env_dim).to(self.device)
         if learn_seed:
             self.seed[4:, env_dim//2, env_dim//2, env_dim//2] = torch.randn(n_channels-4) * seed_std
             self.seed = nn.Parameter(self.seed)
@@ -31,7 +32,7 @@ class NCA(nn.Module):
         self.process2 = nn.Conv3d(2*n_channels, n_channels, kernel_size=1)
     
     def forward(self, x, use_soft_living_mask=False):
-        update_mask = (torch.rand(x[:, :1].shape, dtype=torch.float32).to(device) <= self.update_prob).float()
+        update_mask = (torch.rand(x[:, :1].shape, dtype=torch.float32).to(self.device) <= self.update_prob).float()
         
         y = self.perceive(x)
         y = self.norm1(y)
@@ -61,6 +62,6 @@ class NCA(nn.Module):
         target_living_mask = (target[:, 3:4] > self.alive_thres).float()
 
         undergrowth_loss = F.mse_loss(x_rgba * target_living_mask, target * target_living_mask) 
-        overgrowth_loss = self.overgrowth_to_undergrowth_penalty * F.mse_loss(x_rgba * (1.-target_living_mask) * x_living_mask, torch.zeros(target.shape).to(device))
+        overgrowth_loss = self.overgrowth_to_undergrowth_penalty * F.mse_loss(x_rgba * (1.-target_living_mask) * x_living_mask, torch.zeros(target.shape).to(self.device))
         loss = undergrowth_loss + overgrowth_loss
         return loss, undergrowth_loss, overgrowth_loss

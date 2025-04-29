@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from model.NCA import NCA
 
 # ==== Model + Setup ====
-model_name = "mario_curriculum4_damage_over1_13000"
+model_name = "mario_curriculum4_ln_damage_4-12_over10"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16

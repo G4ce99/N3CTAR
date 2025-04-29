@@ -17,7 +17,7 @@ def generate_seed(n_channels, env_dim):
 class NCA(nn.Module):
     def __init__(self, n_channels, env_dim, learn_seed=True, seed_std=0.01, update_prob=0.5, alive_thres=0.1, overgrowth_to_undergrowth_penalty=1.0):
         super().__init__()
-
+        self.temperature = 50
         self.update_prob = update_prob
         self.alive_thres = alive_thres
         self.overgrowth_to_undergrowth_penalty = overgrowth_to_undergrowth_penalty
@@ -32,7 +32,9 @@ class NCA(nn.Module):
 
         # Perception layer
         self.perceive = nn.Conv3d(n_channels, 3*n_channels, kernel_size=3, padding=1)
-        self.norm1 = nn.LayerNorm((3 * n_channels, env_dim, env_dim, env_dim))
+        # self.norm1 = nn.LayerNorm((3 * n_channels, env_dim, env_dim, env_dim))
+        # self.norm1 = nn.LayerNorm((3 * n_channels-4, env_dim, env_dim, env_dim))
+        # self.norm1 = nn.GroupNorm(num_groups=11, num_channels=3*n_channels-4)
         
         # Processing layers with residual connections
         self.process1 = nn.Conv3d(3*n_channels, 2*n_channels, kernel_size=1)
@@ -51,7 +53,10 @@ class NCA(nn.Module):
         update_mask = ((torch.rand(x[:, :1].shape, dtype=torch.float32).to(device) <= self.update_prob) * (nbrs>0)).float()
         
         y = self.perceive(x)
-        y = self.norm1(y)
+        # y = self.norm1(y) # For LayerNorm
+        # hidden_state = y[:, 4:, ...]
+        # hidden_norm = self.norm1(hidden_state) 
+        # y = torch.cat((y[:, :4, ...], hidden_norm), dim=1)
         y = F.relu(y)
         
         z = self.process1(y)
@@ -61,10 +66,11 @@ class NCA(nn.Module):
         x = x + dx*update_mask
         
         if self.training:
-            alpha = 0.8 
-            soft_mask = F.sigmoid((F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) - self.alive_thres) * 50)
-            hard_mask = (F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) > self.alive_thres).float()
-            living_mask = alpha * soft_mask + (1-alpha) * hard_mask
+            soft_mask = F.sigmoid((F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) - self.alive_thres) * self.temperature)
+            # alpha = 0.8
+            # hard_mask = (F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) > self.alive_thres).float()
+            # living_mask = alpha * soft_mask + (1-alpha) * hard_mask
+            living_mask = soft_mask
         else:
             living_mask = (F.max_pool3d(x[:, 3:4], kernel_size=3, stride=1, padding=1) > self.alive_thres).float()
             

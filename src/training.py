@@ -5,9 +5,12 @@ import wandb
 from tqdm import tqdm
 import os
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
 import modal
 
 from config import *
+from utils import *
 from model import NCA
 
 #################
@@ -80,44 +83,59 @@ def train_fn(rank, world_size):
   losses = []
   empty_cache_n_iter = 10 # 25
   
-  for i in tqdm(range(epochs)):
-    x = ddp_model.module.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
-    curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
-    min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
-    n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
-    if n_eval_iter > 0:
-      ddp_model.eval()
-      with torch.no_grad():
-        for _ in range(n_eval_iter):
-          x = ddp_model(x, i<0.05*epochs)
+  with check_profile(
+      enable_profiling,
+      activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+      profile_memory=True,
+      record_shapes=True,
+      with_stack=True,
+  ) as prof:
+    for i in tqdm(range(epochs)):
+      # stop profiling after 3 epochs
+      if enable_profiling and i >= 3:
+        break
 
-    ddp_model.train()
-    n_iter = np.random.randint(min_iter, max_iter)
-    for _ in range(n_iter):
-      x = ddp_model(x, i<0.05*epochs)
-    loss, underloss, overloss = ddp_model.module.get_loss(x, rgba_voxels)
+      x = ddp_model.module.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
+      curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
+      min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
+      n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
+      if n_eval_iter > 0:
+        ddp_model.eval()
+        with torch.no_grad():
+          for _ in range(n_eval_iter):
+            x = ddp_model(x, i<0.05*epochs)
 
-    optimizer.zero_grad()
-    loss.backward()
+      ddp_model.train()
+      n_iter = np.random.randint(min_iter, max_iter)
+      for _ in range(n_iter):
+        x = ddp_model(x, i<0.05*epochs)
+      loss, underloss, overloss = ddp_model.module.get_loss(x, rgba_voxels)
 
-    torch.nn.utils.clip_grad_norm_(ddp_model.parameters(), max_norm=0.5)  # Tighter gradient clipping
+      optimizer.zero_grad()
+      loss.backward()
 
-    optimizer.step()
+      torch.nn.utils.clip_grad_norm_(ddp_model.parameters(), max_norm=0.5)  # Tighter gradient clipping
 
-    losses.append(loss.item())
-    
-    if wandb_log:
-      metrics = {
-            "Total Loss": loss.item(),
-            "Undergrowth Loss": underloss.item(),
-            "Overgrowth Loss": overloss.item()
-        }
-      wandb_run.log(metrics, step=i)
-    
-    if i % empty_cache_n_iter == empty_cache_n_iter-1:
-      if not wandb_log:
-        print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
-      torch.cuda.empty_cache()
+      optimizer.step()
+
+      losses.append(loss.item())
+      
+      if wandb_log:
+        metrics = {
+              "Total Loss": loss.item(),
+              "Undergrowth Loss": underloss.item(),
+              "Overgrowth Loss": overloss.item()
+          }
+        wandb_run.log(metrics, step=i)
+      
+      if i % empty_cache_n_iter == empty_cache_n_iter-1:
+        if not wandb_log:
+          print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
+        torch.cuda.empty_cache()
+  
+  if enable_profiling:
+    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
+    prof.export_chrome_trace(f"trace_rank{rank}.json")
   
   if wandb_log:
     wandb_run.finish()

@@ -3,12 +3,12 @@ import os
 from pathlib import Path
 
 # data settings
-img_data_path = Path().resolve().parent / "data" / "npy_voxels" / "mario_filled.npy"
-environment_size = 32
+img_data_path = Path().resolve().parent / "data" / "npy_voxels" / "mario_vox.npy"
+environment_size = 64
 alive_thres = 0.1
 
 ## model settings
-model_name = "mario_filled_curriculum_epochs_1000"
+model_name = "mario_filled_curriculum_epochs_1000_env64"
 input_channels = 16
 learn_seed = True
 seed_std = 0.05

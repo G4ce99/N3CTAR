@@ -14,7 +14,7 @@ from model import NCA
 # setup modal   #
 #################
 # NOTE: go into settings and setup token if you haven't already
-app = modal.App("n3ctar-training")
+# app = modal.App("n3ctar-training")
 
 #################
 # prepare data  #
@@ -36,6 +36,8 @@ for i in range(len(voxel_coords)):
   r, g, b = vox_data[i, 3:] / 255.0
   rgba_vox[x, y, z] = [r, g, b, 1.0] # 1.0 is for alpha
 
+rgba_voxels = torch.tensor(rgba_vox, dtype=torch.float32).permute(3, 0, 1, 2).to(device)
+print(f"rgba_voxels shape: {rgba_voxels.shape}, {rgba_voxels.dtype}") # (4, 32, 32, 32) 
 
 #################
 #   init model  #
@@ -69,7 +71,7 @@ if wandb_log:
   run_name = model_name
   wandb_run = wandb.init(project=project_name, name=run_name)
 
-@app.function(gpu="A100-40GB", region="us-east")
+# @app.function(gpu="A100-40GB", region="us-east")
 def train():
   losses = []
   empty_cache_n_iter = 10 # 25
@@ -113,3 +115,5 @@ def train():
 
   os.makedirs("./ckpts", exist_ok=True)
   torch.save(model.state_dict(), f"./ckpts/{model_name}.pth")
+
+train()

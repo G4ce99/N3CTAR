@@ -118,12 +118,11 @@ class MainWindow(QtWidgets.QMainWindow):
         colors = np.clip(colors, 0, 1)
 
         # Highlight a specific voxel if provided
-        if highlight_voxel is not None:
-            for i, coord in enumerate(coords):
-                if np.array_equal(coord, highlight_voxel):
-                    colors[i] = [0, 1, 0]  # Set the color to red
+        # if highlight_voxel is not None:
+        #     for i, coord in enumerate(coords):
+        #         if np.array_equal(coord, highlight_voxel):
+        #             colors[i] = [0, 1, 0]  # Set the color to red
 
-        
 
         if hasattr(self, "mesh") and self.mesh is not None:
             self.mesh.parent = None
@@ -184,6 +183,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return origin, direction
     
     def fuzzy_voxel_hit(self, origin, direction, voxel_grid, voxel_size=1.0, radius=0.75):
+        global x, living_mask
         # grab voxel grid shape and alive voxels
         grid_shape = voxel_grid.shape
         alive_voxels = np.argwhere(voxel_grid)  # (N, 3)
@@ -216,6 +216,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 if t < closest_t:
                     closest_t = t
                     best_hit = tuple(voxel)
+
+        x[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
+        living_mask[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
 
         return best_hit
 

@@ -5,12 +5,9 @@ import wandb
 from tqdm import tqdm
 import os
 
-from torch.profiler import profile, record_function, ProfilerActivity
-
 import modal
 
 from config import *
-from utils import *
 from model import NCA
 
 #################
@@ -39,9 +36,21 @@ for i in range(len(voxel_coords)):
   r, g, b = vox_data[i, 3:] / 255.0
   rgba_vox[x, y, z] = [r, g, b, 1.0] # 1.0 is for alpha
 
+rgba_voxels = torch.tensor(rgba_vox, dtype=torch.float32).permute(3, 0, 1, 2).to(device)
+print(f"rgba_voxels shape: {rgba_voxels.shape}, {rgba_voxels.dtype}") # (4, 32, 32, 32) 
+
 #################
 #   init model  #
 #################
+model = NCA(input_channels, 
+            environment_size, 
+            learn_seed=learn_seed, 
+            update_prob=update_prob, 
+            alive_thres=alive_thres, 
+            overgrowth_to_undergrowth_penalty=over_to_under_penalty)
+model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 def init_weights(m):
   if isinstance(m, nn.Conv3d):
@@ -50,110 +59,61 @@ def init_weights(m):
     if m.bias is not None:
       nn.init.constant_(m.bias, 0)
 
+model.apply(init_weights)
 
 
-def train_fn(rank, world_size):
-  setup(rank, world_size)
+##############
+# init wandb # - move this to config later
+##############
 
-  # init data
-  rgba_voxels = torch.tensor(rgba_vox, dtype=torch.float32).permute(3, 0, 1, 2).to(rank)
-  
-  # init model, opt, loss
-  model = NCA(input_channels, 
-            environment_size,
-            rank,
-            learn_seed=learn_seed, 
-            update_prob=update_prob, 
-            alive_thres=alive_thres, 
-            overgrowth_to_undergrowth_penalty=over_to_under_penalty)
-  model.to(rank) # send model to rank instead of "device"
-  model.apply(init_weights)
-  
-  ddp_model = DDP(model, device_ids=[rank])
+if wandb_log:
+  project_name = "n3ctar"
+  run_name = model_name
+  wandb_run = wandb.init(project=project_name, name=run_name)
 
-  # wand init - init for every rank
-  if wandb_log:
-    project_name = "n3ctar"
-    run_name = model_name + f"_rank{rank}"
-    wandb_run = wandb.init(project=project_name, name=run_name)
-
-  # init opt
-  optimizer = torch.optim.AdamW(ddp_model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-
+# @app.function(gpu="A100-40GB", region="us-east")
+def train():
   losses = []
   empty_cache_n_iter = 10 # 25
-  
-  with check_profile(
-      enable_profiling,
-      activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-      profile_memory=True,
-      record_shapes=True,
-      with_stack=True,
-  ) as prof:
-    for i in tqdm(range(epochs)):
-      # stop profiling after 3 epochs
-      if enable_profiling and i >= 3:
-        break
 
-      x = ddp_model.module.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
-      curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
-      min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
-      n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
-      if n_eval_iter > 0:
-        ddp_model.eval()
-        with torch.no_grad():
+  for i in tqdm(range(epochs)):
+    x = model.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
+    curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
+    min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
+    n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
+    if n_eval_iter > 0:
+      model.eval()
+      with torch.no_grad():
           for _ in range(n_eval_iter):
-            x = ddp_model(x, i<0.05*epochs)
+              x = model(x, i<0.05*epochs)
 
-      ddp_model.train()
-      n_iter = np.random.randint(min_iter, max_iter)
-      for _ in range(n_iter):
-        x = ddp_model(x, i<0.05*epochs)
-      loss, underloss, overloss = ddp_model.module.get_loss(x, rgba_voxels)
+    model.train()
+    n_iter = np.random.randint(min_iter, max_iter)
+    for _ in range(n_iter):
+      x = model(x, i<0.05*epochs)
+    loss, underloss, overloss = model.get_loss(x, rgba_voxels)
+    optimizer.zero_grad()
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)  # Tighter gradient clipping
+    optimizer.step()
+    losses.append(loss.item())
+    if wandb_log:
+      metrics = {
+          "Total Loss": loss.item(),
+          "Undergrowth Loss": underloss.item(),
+          "Overgrowth Loss": overloss.item()
+      }
+      wandb_run.log(metrics, step=i)
 
-      optimizer.zero_grad()
-      loss.backward()
-
-      torch.nn.utils.clip_grad_norm_(ddp_model.parameters(), max_norm=0.5)  # Tighter gradient clipping
-
-      optimizer.step()
-
-      losses.append(loss.item())
-      
-      if wandb_log:
-        metrics = {
-              "Total Loss": loss.item(),
-              "Undergrowth Loss": underloss.item(),
-              "Overgrowth Loss": overloss.item()
-          }
-        wandb_run.log(metrics, step=i)
-      
-      if i % empty_cache_n_iter == empty_cache_n_iter-1:
-        if not wandb_log:
+    if  i % empty_cache_n_iter == empty_cache_n_iter-1:
+      if not wandb_log:
           print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
-        torch.cuda.empty_cache()
-  
-  if enable_profiling:
-    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
-    prof.export_chrome_trace(f"trace_rank{rank}.json")
-  
+      torch.cuda.empty_cache()
+
   if wandb_log:
     wandb_run.finish()
-  
-  if rank == 0: # only save on rank 0
-    os.makedirs("./ckpts", exist_ok=True)
-    torch.save(model.state_dict(), f"./ckpts/{model_name}.pth")
-    print("Training done!")
-  
-  cleanup()
 
+  os.makedirs("./ckpts", exist_ok=True)
+  torch.save(model.state_dict(), f"./ckpts/{model_name}.pth")
 
-def run_training(train_fn, world_size):
-  mp.spawn(train_fn,
-           args=(world_size,),
-           nprocs=world_size,
-           join=True)
-
-if __name__=="__main__":
-  world_size = n_gpus
-  run_training(train_fn, world_size)
+train()

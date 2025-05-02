@@ -7,7 +7,7 @@ environment_size = 32
 alive_thres = 0.1
 
 ## model settings
-model_name = "mario_filled_curriculum_epochs_1000_env64"
+model_name = "mario_filled_curriculum_epochs_1000_env32"
 input_channels = 16
 learn_seed = True
 seed_std = 0.05
@@ -29,7 +29,7 @@ weight_decay = 0
 
 # misc settings
 wandb_log = True
-enable_profiling = True
+enable_profiling = False
 
 # DDP settings
 n_gpus = 2

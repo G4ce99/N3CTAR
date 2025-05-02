@@ -5,16 +5,13 @@ import wandb
 from tqdm import tqdm
 import os
 
+from torch.profiler import profile, record_function, ProfilerActivity
 import modal
 
 from config import *
+from utils import *
 from model import NCA
 
-#################
-# setup modal   #
-#################
-# NOTE: go into settings and setup token if you haven't already
-# app = modal.App("n3ctar-training")
 
 #################
 # prepare data  #
@@ -67,7 +64,7 @@ model.apply(init_weights)
 ##############
 
 if wandb_log:
-  project_name = "n3ctar"
+  project_name = "n3ctar_experiments"
   run_name = model_name
   wandb_run = wandb.init(project=project_name, name=run_name)
 
@@ -76,44 +73,61 @@ def train():
   losses = []
   empty_cache_n_iter = 10 # 25
 
-  for i in tqdm(range(epochs)):
-    x = model.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
-    curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
-    min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
-    n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
-    if n_eval_iter > 0:
-      model.eval()
-      with torch.no_grad():
-          for _ in range(n_eval_iter):
-              x = model(x, i<0.05*epochs)
+  with check_profile(
+      enable_profiling,
+      activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+      profile_memory=True,
+      record_shapes=True,
+      with_stack=True,
+  ) as prof:
+    for i in tqdm(range(epochs)):
+      # stop profiling after 3 epochs
+      if enable_profiling and i>= 3:
+        break
 
-    model.train()
-    n_iter = np.random.randint(min_iter, max_iter)
-    for _ in range(n_iter):
-      x = model(x, i<0.05*epochs)
-    loss, underloss, overloss = model.get_loss(x, rgba_voxels)
-    optimizer.zero_grad()
-    loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)  # Tighter gradient clipping
-    optimizer.step()
-    losses.append(loss.item())
-    if wandb_log:
-      metrics = {
-          "Total Loss": loss.item(),
-          "Undergrowth Loss": underloss.item(),
-          "Overgrowth Loss": overloss.item()
-      }
-      wandb_run.log(metrics, step=i)
+      x = model.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
+      curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
+      min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
+      n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
+      if n_eval_iter > 0:
+        model.eval()
+        with torch.no_grad():
+            for _ in range(n_eval_iter):
+                x = model(x, i<0.05*epochs)
 
-    if  i % empty_cache_n_iter == empty_cache_n_iter-1:
-      if not wandb_log:
-          print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
-      torch.cuda.empty_cache()
+      model.train()
+      n_iter = np.random.randint(min_iter, max_iter)
+      for _ in range(n_iter):
+        x = model(x, i<0.05*epochs)
+      loss, underloss, overloss = model.get_loss(x, rgba_voxels)
+      optimizer.zero_grad()
+      loss.backward()
+      torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)  # Tighter gradient clipping
+      optimizer.step()
+      losses.append(loss.item())
+      if wandb_log:
+        metrics = {
+            "Total Loss": loss.item(),
+            "Undergrowth Loss": underloss.item(),
+            "Overgrowth Loss": overloss.item()
+        }
+        wandb_run.log(metrics, step=i)
+
+      if  i % empty_cache_n_iter == empty_cache_n_iter-1:
+        if not wandb_log:
+            print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
+        torch.cuda.empty_cache()
+
+  if enable_profiling:
+    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
+    print()
+    print(prof.key_averages().table(sort_by="self_cuda_memory_usage", row_limit=10))
+    # prof.export_chrome_trace(f"trace_rank{rank}.json")
 
   if wandb_log:
     wandb_run.finish()
 
-  os.makedirs("./ckpts", exist_ok=True)
-  torch.save(model.state_dict(), f"./ckpts/{model_name}.pth")
+  # os.makedirs("./ckpts", exist_ok=True)
+  # torch.save(model.state_dict(), f"./ckpts/{model_name}.pth")
 
 train()

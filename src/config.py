@@ -1,4 +1,5 @@
 import os
+import torch
 from pathlib import Path
 
 # data settings
@@ -7,7 +8,7 @@ environment_size = 32
 alive_thres = 0.1
 
 ## model settings
-model_name = "mario_filled_curriculum_epochs_1000_env32"
+model_name = "mario_filled_curriculum_epochs_testing_env32"
 input_channels = 16
 learn_seed = True
 seed_std = 0.05
@@ -15,8 +16,8 @@ update_prob = 0.9 # 0.75
 over_to_under_penalty = 1
 
 # # training hyperparams
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 batch_size = 8
 epochs = 1000
@@ -29,7 +30,7 @@ weight_decay = 0
 
 # misc settings
 wandb_log = True
-enable_profiling = False
+enable_profiling = True
 
 # DDP settings
-n_gpus = 2
+# n_gpus = 2

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# from config import device
+from config import device
 
 def generate_seed(n_channels, env_dim):
     seed = torch.zeros((n_channels, env_dim, env_dim, env_dim), dtype=torch.float32)
@@ -10,7 +10,7 @@ def generate_seed(n_channels, env_dim):
     return seed
 
 class NCA(nn.Module):
-    def __init__(self, n_channels, env_dim, device, learn_seed=True, seed_std=0.01, update_prob=0.5, alive_thres=0.1, overgrowth_to_undergrowth_penalty=1.0):
+    def __init__(self, n_channels, env_dim, learn_seed=True, seed_std=0.01, update_prob=0.5, alive_thres=0.1, overgrowth_to_undergrowth_penalty=1.0):
         super().__init__()
 
         self.device = device

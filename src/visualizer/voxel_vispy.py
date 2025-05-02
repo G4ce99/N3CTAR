@@ -12,13 +12,16 @@ import signal
 from vispy.scene.visuals import Line
 from vispy.scene.cameras import TurntableCamera
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
 
-from nca_model.NCA import NCA
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from nca_model.NCA_hidden_LayerNorm import NCA
+
+#from nca_model.NCA import NCA
 
 
 # ==== Model + Setup ====
-model_name = "mario_curriculum3wide_epochs_2400"
+model_name = "final_mario_focused_lin_damage5_p06_1-1_6000"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16
@@ -45,7 +48,7 @@ model = NCA(input_channels,
             overgrowth_to_undergrowth_penalty=over_to_under_penalty)
 
 model.to(device)
-model.load_state_dict(torch.load(ckpt_path, map_location=device))
+model.load_state_dict(torch.load(ckpt_path, map_location=device), strict=False)
 model.eval()
 
 x = model.seed.unsqueeze(0)
@@ -65,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(central_widget)
 
         # VisPy canvas
-        self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='white', parent=central_widget, size=(800, 600))
+        self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='lightgray', parent=central_widget, size=(800, 600))
         layout.addWidget(self.canvas.native)
 
         # VisPy 3D setup
@@ -126,6 +129,12 @@ class MainWindow(QtWidgets.QMainWindow):
         colors = rgba[alive][..., :3]
         colors = np.clip(colors, 0, 1)
 
+        # Reduce saturation
+        hsv_colors = rgb_to_hsv(colors)  # Convert RGB to HSV
+        hsv_colors[:, 1] *= 0.75  # Reduce saturation
+        hsv_colors[:, 1] = np.clip(hsv_colors[:, 1], 0, 1)  # Ensure valid range
+        colors = hsv_to_rgb(hsv_colors)  # Convert back to RGB
+
 
         if hasattr(self, "mesh") and self.mesh is not None:
             self.mesh.parent = None
@@ -156,7 +165,7 @@ class MainWindow(QtWidgets.QMainWindow):
         F = np.vstack(all_faces)
         C = np.vstack(all_colors)
 
-        self.mesh = Mesh(vertices=V, faces=F, vertex_colors=C, shading='flat', parent=self.view.scene)
+        self.mesh = Mesh(vertices=V, faces=F, vertex_colors=C, shading=None, parent=self.view.scene)
 
     def get_mouse_ray(self,view, x, y):
 
@@ -279,13 +288,17 @@ class MainWindow(QtWidgets.QMainWindow):
         
         
     def step_model(self):
-        global x, eval_iter
-        with torch.no_grad():
-            x = model(x)
-            eval_iter += 1
-            self.update_visual(torch.clamp(x[0, :4], 0., 1.))
-            self.setWindowTitle(f"NCA Viewer - Iteration {eval_iter}")
-
+        global x, living_mask, eval_iter
+        try:
+            with torch.no_grad():
+                x, living_mask = model(x, living_mask)
+                eval_iter += 1
+                self.update_visual(torch.clamp(x[0, :4], 0., 1.))
+                self.setWindowTitle(f"NCA Viewer - Iteration {eval_iter}")
+        except Exception as e:
+            print(f"⚠️ Error in step_model: {e}")
+            self.stop_simulation()  # Stop the simulation to prevent further errors
+            clean_exit()  # Call the cleanup function
     def start_simulation(self):
         if not self.is_running:
             self.timer.start(100)  # ms per step
@@ -297,8 +310,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.is_running = False
 
     def reset_simulation(self):
-        global x, eval_iter
-        x = model.seed.unsqueeze(0)
+        global x, living_mask, eval_iter
+        x = model.get_seed().unsqueeze(0)
+        living_mask = (x[:,3:4] > model.alive_thres).float()
+
         eval_iter = 0
         self.update_visual(torch.clamp(x[0, :4], 0., 1.))
         self.setWindowTitle("NCA Viewer - Reset")
@@ -324,8 +339,13 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, clean_exit)  # Handle Ctrl+C
     signal.signal(signal.SIGTERM, clean_exit)  # Handle termination signals
 
-    app.use_app('pyqt5')  # Use Qt backend
-    qt_app = QtWidgets.QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    qt_app.exec_()
+    try:
+        app.use_app('pyqt5')  # Use Qt backend
+        qt_app = QtWidgets.QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
+        qt_app.exec_()
+    except Exception as e:
+        print(f"⚠️ Unhandled exception: {e}")
+    finally:
+        clean_exit()

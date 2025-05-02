@@ -4,18 +4,18 @@ from pathlib import Path
 import numpy as np
 
 # data settings
-img_data_path = Path().resolve().parent / "data" / "npy_voxels" / "mario_vox.npy"
+img_data_path = Path().resolve().parent / "data" / "npy_voxels" / "mario.npy"
 environment_size = 32
 alive_thres = 0.1
 
 ## model settings
-model_name = "mario_testing_env32"
+model_name = "mario_testing_env32_mario"
 
 batch_size = 8
 input_channels = 16
 learn_seed = True
 seed_std = 0.05
-update_prob = 0.9 # 0.75
+update_prob = 1.0 # 0.75
 over_to_under_penalty = 10
 damage_prob = 0.4
 

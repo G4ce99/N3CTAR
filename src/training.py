@@ -72,6 +72,7 @@ if wandb_log:
 def train():
   losses = []
   empty_cache_n_iter = 10 # 25
+  epoch_ckpt_freq = 1000
 
   with check_profile(
       enable_profiling,
@@ -85,38 +86,56 @@ def train():
       if enable_profiling and i>= 3:
         break
 
-      x = model.seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
-      curriculum = np.random.randint(0, min(len(curriculum_eval_updates), 1 + (i//epoch_per_curriculum)))
-      min_eval_iter, max_eval_iter = curriculum_eval_updates[curriculum]
-      n_eval_iter = np.random.randint(min_eval_iter, max_eval_iter)
+      model.temperature = 5 + 45 * min(i/1000, 1.0)
+      seed = model.get_seed()
+      x = seed.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1).to(device)
+      living_mask = (x[:,3:4] > model.alive_thres).float()
+      
+      n_eval_iter = eval_update_samples[i]
+      
       if n_eval_iter > 0:
-        model.eval()
-        with torch.no_grad():
-            for _ in range(n_eval_iter):
-                x = model(x, i<0.05*epochs)
+          model.eval()
+          with torch.no_grad():
+              for _ in range(n_eval_iter):
+                  x, living_mask = model(x, living_mask, i<0.05*epochs)
+
+              if np.random.rand() < damage_prob * min(1.0, (i%epochs_per_curric)/(0.2*epochs_per_curric)):
+                  for __ in range(np.random.randint(1, 2)):
+                      damage_x = np.random.randint(0, 27)
+                      damage_y = np.random.randint(0, 27)
+                      damage_z = np.random.randint(0, 27)
+                      x[:, :, damage_x:damage_x+5, damage_y:damage_y+5, damage_z:damage_z+5] = 0
+                      living_mask[:, :, damage_x:damage_x+5, damage_y:damage_y+5, damage_z:damage_z+5] = 0
 
       model.train()
       n_iter = np.random.randint(min_iter, max_iter)
+      prev_x=None
       for _ in range(n_iter):
-        x = model(x, i<0.05*epochs)
-      loss, underloss, overloss = model.get_loss(x, rgba_voxels)
+          prev_x=x
+          x, living_mask = model(x, living_mask, i<0.05*epochs)
+      loss, underloss, overloss, stabilityloss = model.get_loss(x, rgba_voxels, prev_x, stability_factor=10*i/epochs)
       optimizer.zero_grad()
       loss.backward()
       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)  # Tighter gradient clipping
       optimizer.step()
       losses.append(loss.item())
       if wandb_log:
-        metrics = {
-            "Total Loss": loss.item(),
-            "Undergrowth Loss": underloss.item(),
-            "Overgrowth Loss": overloss.item()
-        }
-        wandb_run.log(metrics, step=i)
+          metrics = {
+              "Total Loss": loss.item(),
+              "Undergrowth Loss": underloss.item(),
+              "Overgrowth Loss": overloss.item(),
+              "Stability Loss": stabilityloss.item()
+          }
+          wandb_run.log(metrics, step=i)
 
-      if  i % empty_cache_n_iter == empty_cache_n_iter-1:
-        if not wandb_log:
-            print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
-        torch.cuda.empty_cache()
+      if (i+1) % epoch_ckpt_freq == 0:
+          os.makedirs("./ckpts", exist_ok=True)
+          torch.save(model.state_dict(), os.path.join(f"./ckpts/{model_name}_{i+1}.pth"))
+
+      if  (i+1) % empty_cache_n_iter == 0:
+          if not wandb_log:
+              print(f"Epoch: {i}, Loss: {loss.item()}, Undergrowth Loss: {underloss.item()}, Overgrowth Loss: {overloss.item()}")
+          torch.cuda.empty_cache()
 
   if enable_profiling:
     print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))

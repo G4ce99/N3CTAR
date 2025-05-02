@@ -6,3 +6,4 @@ moviepy
 pathlib
 wandb
 tqdm
+modal

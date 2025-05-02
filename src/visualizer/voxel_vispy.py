@@ -10,11 +10,12 @@ from vispy.scene import SceneCanvas
 from vispy.scene.events import SceneMouseEvent
 import signal
 from vispy.scene.visuals import Line
-
+from vispy.scene.cameras import TurntableCamera
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from nca_model.NCA import NCA
+
 
 # ==== Model + Setup ====
 model_name = "mario_curriculum3wide_epochs_2400"
@@ -72,6 +73,8 @@ class MainWindow(QtWidgets.QMainWindow):
         center = env_dim // 2
 
         self.view.camera = scene.cameras.TurntableCamera()
+        #self.view.camera = DragBlockCamera(parent=self.view.scene)
+
         self.view.camera.center = (center, center, center)
         self.view.camera.set_range(x=(0, env_dim), y=(0, env_dim), z=(0, env_dim))
         self.view.camera.distance = 3 * env_dim
@@ -82,6 +85,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # add mouse click 
         self.canvas.events.mouse_press.connect(self.on_mouse_press)
+        self.canvas.events.mouse_move.connect(self.on_mouse_move)
+        self.canvas.events.mouse_release.connect(self.on_mouse_release)
+        self.canvas.events.key_press.connect(self.on_key_press)
+        self.canvas.events.key_release.connect(self.on_key_release)
 
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -105,6 +112,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.step_model)
         self.is_running = False
+        self.is_dragging = False
+        self.d_key_pressed = False
 
         self.update_visual(torch.clamp(x[0, :4], 0., 1.))
 
@@ -116,12 +125,6 @@ class MainWindow(QtWidgets.QMainWindow):
         #print(coords)
         colors = rgba[alive][..., :3]
         colors = np.clip(colors, 0, 1)
-
-        # Highlight a specific voxel if provided
-        # if highlight_voxel is not None:
-        #     for i, coord in enumerate(coords):
-        #         if np.array_equal(coord, highlight_voxel):
-        #             colors[i] = [0, 1, 0]  # Set the color to red
 
 
         if hasattr(self, "mesh") and self.mesh is not None:
@@ -227,8 +230,9 @@ class MainWindow(QtWidgets.QMainWindow):
         end = origin + direction * length
         ray_line = Line(pos=np.array([origin, end]), color='blue', width=5, parent=view.scene)
         return ray_line
-
-    def on_mouse_press(self, event):
+    
+    # helper to check handle ray intersection
+    def handle_ray_hit(self, event):
         mouse_x, mouse_y = event.pos
         origin, direction = self.get_mouse_ray(self.view, mouse_x, mouse_y)
         # self.draw_ray(self.view, origin, direction)
@@ -244,6 +248,35 @@ class MainWindow(QtWidgets.QMainWindow):
             print("Hit voxel at:", hit_voxel)
 
         self.update_visual(rgba, highlight_voxel=hit_voxel)
+
+    # check for destruction key press
+    def on_key_press(self, event):
+        if event.key == 'D':
+            self.d_key_pressed = True
+
+    def on_key_release(self, event):
+        if event.key == 'D':
+            self.d_key_pressed = False
+
+    def on_mouse_press(self, event):
+        if self.d_key_pressed:
+            self.view.camera.interactive = False
+            self.is_dragging = True
+            self.handle_ray_hit(event)
+
+    
+    def on_mouse_move(self, event):
+        if self.is_dragging and self.d_key_pressed:
+            self.handle_ray_hit(event)
+              
+        
+    def on_mouse_release(self, event):
+        if self.is_dragging and self.d_key_pressed:
+            self.is_dragging = False
+            self.view.camera.interactive = True
+            
+            
+        
         
     def step_model(self):
         global x, eval_iter

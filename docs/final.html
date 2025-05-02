@@ -1,0 +1,104 @@
+<html>
+	<head>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<style>
+			h1 {
+				text-align: center;
+			}
+
+			.container {
+				margin: 0 auto;
+				padding: 60px 20%;
+			}
+
+			figure {
+				text-align: center;
+			}
+
+			img {
+				display: inline-block;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+		<h1>N3CTAR: Neural 3D Cellular Tessellated Automata Rendering (Team 44)</h1>
+		<div style="text-align: center;">Names: Annabel Ng, George Rickus, Henry Ko, Samarth Jajoo</div>
+
+		<br>
+		Link to webpage: <a href="https://g4ce99.github.io/N3CTAR/">g4ce99.github.io/N3CTAR/</a>
+
+		<br>
+		Link to GitHub repository: <a href="https://github.com/G4ce99/N3CTAR">github.com/G4ce99/N3CTAR</a>
+
+		<br>
+		TODO UPDATE Link to video: <a href="https://tinyurl.com/n3ctarVid" target="_blank">tinyurl.com/n3ctarVid</a>
+
+		<br>
+		TODO UPDATE Link to slides: <a href="https://tinyurl.com/n3ctarSlides" target="_blank">tinyurl.com/n3ctarSlides</a>
+
+    <h2>Abstract</h2>>
+    <br><br>
+    
+    <h2>Technical approach</h2>
+    <h3>1. 3D mesh to 3D Voxel Pipeline</h3>
+      We found a <a href="https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">3D colored mesh database</a> that are in .PLY files. Each vertex of a mesh is represented by 3 coordinates(x,y,z) and its RGB(r,g,b).
+    <br><br>
+      <img src="images/3d_database_img.png" alt="3d database img" style="display: block; margin: auto;" width="500">
+    <br>
+    UPDATE TODO: Since our model would work over voxels, we wrote a script that would convert the 3D mesh into voxels, and then to .NPY files to use as inputs to training the neural network. 
+    Specifically, we traverse through each triangle in the mesh and use barycentric coordinates to check if the voxel center lies in the triangle. If it does, then we interpolate the trinalge color using its barycentrics.
+    To compare multiple triangles that map to the same voxel, we simply select the largest triangle that the voxel center lies in to be the color of the voxel. Here's an example below.
+    <br><br>
+    <div style="text-align:center;">
+      <figure style="display:inline-block; margin:10px;"><img src="images/mario_mesh.png" width="150"><figcaption>3D Mesh Mario</figcaption></figure>
+      <figure style="display:inline-block; margin:10px;"><img src="images/mario_env64.png" width="180"><figcaption>3D Voxelized Mario</figcaption></figure>
+    </div>
+    <br>
+    
+
+    <h3>2. 3D Cellular Automata Neural Network</h3>
+    UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
+	The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
+      <br><br>
+      Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
+      higher-resolution voxels.
+      <div style="text-align:center;">
+        <figure style="display:inline-block;">
+          <img src="images/mario_epochs_1000.gif" alt="Animated GIF" width="400">
+          <figcaption>Preliminary Model Results</figcaption>
+        </figure>
+      </div>
+
+    <h3>3. Interactive Voxel Rendering and Model Evaluation</h3>
+    We used Vispy ... TODO
+    <br><br>
+
+    <h2>Results</h2>
+    TODO
+    <br>
+
+    <h2>References</h2>
+    TODO
+    <br>
+
+    <h2>Contributions</h2>
+    TODO
+    <br>
+
+    <enumerate>
+      <li>Annabel Ng: 3D mesh to 3D voxel pipeline, interactive voxel rendering </li>
+      <li>George Rickus: Model training</li>
+      <li>Henry Ko: 3D mesh to 3D voxel pipeline, model training</li>
+      <li>Samarth Jajoo: Model training</li>
+    </enumerate>
+
+
+		</div>
+	</body>
+</html>

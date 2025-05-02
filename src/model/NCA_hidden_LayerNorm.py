@@ -26,9 +26,8 @@ class NCA(nn.Module):
         self.learn_seed = learn_seed
         self.seed = generate_seed(n_channels, env_dim)
         if learn_seed:
-            self.seed_center = nn.Parameter(torch.empty(n_channels-4)).to(device)
-            nn.init.kaiming_normal_(self.seed_center.unsqueeze(1), mode='fan_in', nonlinearity='relu')
-        self.seed = self.seed.to(device)
+            self.seed_center = nn.Parameter(torch.empty(n_channels-4))
+        self.seed = self.seed
 
         # Perception layer
         self.perceive = nn.Conv3d(n_channels, 3*n_channels, kernel_size=3, padding=1)

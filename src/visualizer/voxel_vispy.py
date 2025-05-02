@@ -10,10 +10,10 @@ import signal
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from model.NCA import NCA
+from model.NCA_hidden_LayerNorm import NCA
 
 # ==== Model + Setup ====
-model_name = "mario_curriculum4_ln_damage_4-12_over10"
+model_name = "final_mario_focused_lin_damage5_p06_1-1_6000"
 ckpt_path = f"../ckpts/{model_name}.pth"
 env_dim = 32
 n_channels = 16
@@ -40,10 +40,10 @@ model = NCA(input_channels,
             overgrowth_to_undergrowth_penalty=over_to_under_penalty)
 
 model.to(device)
-model.load_state_dict(torch.load(ckpt_path, map_location=device))
+model.load_state_dict(torch.load(ckpt_path, map_location=device), strict=False)
 model.eval()
 
-x = model.get_seed().unsqueeze(0)
+x = model.get_seed().unsqueeze(0).to(device)
 living_mask = (x[:,3:4] > model.alive_thres).float()
 eval_iter = 0
 
@@ -173,12 +173,12 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def random_damage(self):
         global x, living_mask
-        for i in range(np.random.randint(4, 12)):
-            damage_x = np.random.randint(0, 26)
-            damage_y = np.random.randint(0, 26)
-            damage_z = np.random.randint(0, 26)
-            x[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
-            living_mask[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
+        for i in range(np.random.randint(1, 5)):
+            damage_x = np.random.randint(0, 25)
+            damage_y = np.random.randint(0, 25)
+            damage_z = np.random.randint(0, 25)
+            x[:, :, damage_x:damage_x+7, damage_y:damage_y+7, damage_z:damage_z+7] = 0
+            living_mask[:, :, damage_x:damage_x+7, damage_y:damage_y+7, damage_z:damage_z+7] = 0
 
 # ==== Run the Qt app ====
 if __name__ == '__main__':

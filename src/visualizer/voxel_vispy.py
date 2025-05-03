@@ -65,7 +65,7 @@ class ModelSwitcher(QWidget):
         super().__init__()
         self.visualizer = visualizer
         self.dropdown = QComboBox(self)
-        self.dropdown.addItems(["Mario 32x32x32", "Duck 32x32x32", "Bald Mario"])
+        self.dropdown.addItems(["Mario 32x32x32", "Duck 32x32x32", "Bald Mario", "Mario Kart"])
         self.dropdown.currentIndexChanged.connect(self.on_model_change)
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.dropdown)
@@ -121,6 +121,19 @@ class ModelSwitcher(QWidget):
             self.visualizer.reset_simulation()
             self.visualizer.update_visual(torch.clamp(self.visualizer.x[0, :4], 0., 1.))
             self.visualizer.setWindowTitle("NCA Viewer - Bald Mario")
+
+        elif index == 3:
+            model_name = 'final_kartmario_focused_lin_damage5_p06_1-1_4000'
+            ckpt_path = f"../ckpts/{model_name}.pth"
+
+            self.visualizer.model, self.visualizer.x, self.visualizer.living_mask, self.visualizer.eval_iter = self.load_model(model_name, ckpt_path)
+            # reset the model
+            self.visualizer.view.camera.flip = (False, False, True)
+            self.visualizer.view.camera.up = 'y'
+            self.visualizer.reset_simulation()
+            self.visualizer.update_visual(torch.clamp(self.visualizer.x[0, :4], 0., 1.))
+            self.visualizer.setWindowTitle("NCA Viewer - Bald Mario")
+
 
 
 # ==== PyQt Main Window ====
@@ -378,7 +391,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # start the simulation
     def start_simulation(self):
         if not self.is_running:
-            self.timer.start(100)  # ms per step
+            self.timer.start(25)  # ms per step
             self.is_running = True
 
     # stop the simulation

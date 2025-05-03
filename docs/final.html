@@ -7,6 +7,10 @@
 				text-align: center;
 			}
 
+      p {
+        line-height: 1.5;
+      }
+
 			.container {
 				margin: 0 auto;
 				padding: 60px 20%;
@@ -21,69 +25,101 @@
 			}
 
 			body {
-				font-family: 'Inter', sans-serif;
+        font-family: 'Inter', sans-serif; 
+        font-size: 17px;
 			}
 		</style>
 	</head>
 	<body>
 		<div class="container">
-		<h1>N3CTAR: Neural 3D Cellular Tessellated Automata Rendering (Team 44)</h1>
-		<div style="text-align: center;">Names: Annabel Ng, George Rickus, Henry Ko, Samarth Jajoo</div>
+		<h1>N3CTAR: Neural 3D Cellular Tessellated Automata Rendering</h1>
+		<div style="text-align: center;">Team 44: Annabel Ng, George Rickus, Henry Ko, Samarth Jajoo</div>
 
-		<br>
-		Link to webpage: <a href="https://g4ce99.github.io/N3CTAR/">g4ce99.github.io/N3CTAR/</a>
+    <div style="text-align: center; margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+      <a href="https://g4ce99.github.io/N3CTAR/" target="_blank" style="text-decoration: none;">
+      <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+      Visit Webpage
+      </button>
+      </a>
+      <a href="https://github.com/G4ce99/N3CTAR" target="_blank" style="text-decoration: none;">
+      <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub Logo" width="20" height="20">
+        GitHub Repo
+      </button>
+      </a>
+      <a href="https://tinyurl.com/n3ctarVid" target="_blank" style="text-decoration: none;">
+      <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/7/75/YouTube_social_white_squircle_%282017%29.svg" alt="Video Logo" width="20" height="20">
+        Watch Video
+      </button>
+      </a>
+      <a href="https://tinyurl.com/n3ctarSlides" target="_blank" style="text-decoration: none;">
+        <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+          View Slides
+        </button>
+      </a>
+    </div>
 
-		<br>
-		Link to GitHub repository: <a href="https://github.com/G4ce99/N3CTAR">github.com/G4ce99/N3CTAR</a>
-
-		<br>
-		TODO UPDATE Link to video: <a href="https://tinyurl.com/n3ctarVid" target="_blank">tinyurl.com/n3ctarVid</a>
-
-		<br>
-		TODO UPDATE Link to slides: <a href="https://tinyurl.com/n3ctarSlides" target="_blank">tinyurl.com/n3ctarSlides</a>
-
-    <h2>Abstract</h2>>
-    <br><br>
-    
-    <h2>Technical approach</h2>
-    <h3>1. 3D mesh to 3D Voxel Pipeline</h3>
-      We found a <a href="https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">3D colored mesh database</a> that are in .PLY files. Each vertex of a mesh is represented by 3 coordinates(x,y,z) and its RGB(r,g,b).
-    <br><br>
-      <img src="images/3d_database_img.png" alt="3d database img" style="display: block; margin: auto;" width="500">
     <br>
-    UPDATE TODO: Since our model would work over voxels, we wrote a script that would convert the 3D mesh into voxels, and then to .NPY files to use as inputs to training the neural network. 
-    Specifically, we traverse through each triangle in the mesh and use barycentric coordinates to check if the voxel center lies in the triangle. If it does, then we interpolate the trinalge color using its barycentrics.
-    To compare multiple triangles that map to the same voxel, we simply select the largest triangle that the voxel center lies in to be the color of the voxel. Here's an example below.
-    <br><br>
-    <div style="text-align:center;">
-      <figure style="display:inline-block; margin:10px;"><img src="images/mario_mesh.png" width="150"><figcaption>3D Mesh Mario</figcaption></figure>
-      <figure style="display:inline-block; margin:10px;"><img src="images/mario_env64.png" width="180"><figcaption>3D Voxelized Mario</figcaption></figure>
+
+    <div style="text-align: center; margin-top: 20px;">
+      <video width="900" controls>
+      <source src="images/title-demo.mov" type="video/mp4">
+      </video>
+    </div>
+
+    <h2 style="text-align: center;">Abstract</h2>
+
+    <p>
+    In this project, we created a framework for rendering a dynamic 3D voxel grid (32x32x32 or 64x64x64) in real-time using a 3D neural cellular automata model, which simulates the evolution of a grid of cells over time where each cell's state is influenced by its neighbors. For our pipeline, we first convert an input colored triangle mesh into a 3D voxel representation and train a 3D convolutional neural network that learns to create and regenerate this voxel representation from a minimal or damaged voxel grid. The model architecture includes [TODO]. The final trained model is visualized with a custom interactive renderer built with <code>Vispy</code> that allows for real-time rendering of the model output and supports user destruction of the voxel grid to simulate damage and regeneration. Prior work in this area has focused on 2D cellular automata or static 3D voxel grids, and our work extends this to 3D cellular automata with a focus on real-time rendering and dynamic user interaction. 
+    </p>
+    
+    <h2 style="text-align: center;">Technical Approach</h2>
+
+    <div style="text-align: center;">
+      <img src="images/pipeline-logo.gif" alt="Pipeline GIF" style="display: block; margin: auto;" width="900" style="object-fit: cover; object-position: top; clip-path: inset(0px 0px 5px 0px);">
     </div>
     <br>
-    
 
-    <h3>2. 3D Cellular Automata Neural Network</h3>
-    UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
-	The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
+      <h3>1. 3D mesh to 3D Voxel Pipeline</h3>
+        We used the <a href="https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">GREYC 3D colored mesh dataset</a> which contains 15 different .PLY files. Each vertex of a mesh is represented by 3 coordinates(x,y,z) and its RGB(r,g,b).
       <br><br>
-      Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
-      higher-resolution voxels.
+        <img src="images/3d_database_img.png" alt="3d database img" style="display: block; margin: auto;" width="400">
+      <br>
+      
+      Since our model works over a voxel grid, we wrote a script that would convert the 3D mesh into voxels, and then to .NPY files to use as inputs to our neural network. The voxelization process is done by first normalizing the triangle mesh to voxel grid space to fit within the given <code>resolution x resolution x resolution</code> voxel grid. We then create a blank 3D grid of voxels and then iterate through each triangle in the mesh. For each triangle, we calculate the voxel bounding box that contains the triangle, then loop through each voxel in the bounding box and use barycentric coordinates to check if the voxel center lies within the triangle. If it does, we assign the color of the voxel to be the color of that given triangle. To compare multiple triangles that map to the same voxel, we simply select the largest triangle that the voxel center lies in to be the color of the voxel. Here's an example below.
+      <br><br>
       <div style="text-align:center;">
-        <figure style="display:inline-block;">
-          <img src="images/mario_epochs_1000.gif" alt="Animated GIF" width="400">
-          <figcaption>Preliminary Model Results</figcaption>
-        </figure>
+        <figure style="display:inline-block; margin:10px;"><img src="images/mario_mesh.png" width="150"><figcaption>3D Mesh Mario</figcaption></figure>
+        <figure style="display:inline-block; margin:10px;"><img src="images/mario_env64.png" width="180"><figcaption>3D Voxelized Mario</figcaption></figure>
       </div>
+      <br>
+      
 
-    <h3>3. Interactive Voxel Rendering and Model Evaluation</h3>
-    We used Vispy ... TODO
-    <br><br>
+      <h3>2. 3D Cellular Automata Neural Network</h3>
+      UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
+    The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
+        <br><br>
+        Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
+        higher-resolution voxels.
+        <div style="text-align:center;">
+          <figure style="display:inline-block;">
+            <img src="images/mario_epochs_1000.gif" alt="Animated GIF" width="400">
+            <figcaption>Preliminary Model Results</figcaption>
+          </figure>
+        </div>
 
-    <h2>Results</h2>
+      <h3>3. Interactive Voxel Rendering and Model Evaluation</h3>
+      Once we have the model trained, we can visualize it with a custom interactive GUI built with <code>Vispy</code> and <code>PyQt</code>. <code>Vispy</code> is a high performance <code>Python</code> library powered by OpenGL for large 2D and 3D visualizations, so it was perfect for this project. It was also compatible with PyTorch and PyQt allowing us to integrate real-time model inference with a GUI. 
+      <br><br>
+
+    <h2 style="text-align: center;">Results</h2>
+
     TODO
     <br>
 
-    <h2>References</h2>
+    <h2 style="text-align: center;">References</h2>
+
     TODO
     <br>
 

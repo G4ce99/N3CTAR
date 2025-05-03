@@ -8,7 +8,11 @@
 			}
 
       p {
-        line-height: 1.5;
+        line-height: 1.6;
+      }
+
+      p.small {
+        line-height: 1.4;
       }
 
 			.container {
@@ -38,7 +42,7 @@
     <div style="text-align: center; margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
       <a href="https://g4ce99.github.io/N3CTAR/" target="_blank" style="text-decoration: none;">
       <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-      Visit Webpage
+      tinyurl.com/n3ctar
       </button>
       </a>
       <a href="https://github.com/G4ce99/N3CTAR" target="_blank" style="text-decoration: none;">
@@ -71,37 +75,45 @@
     <h2 style="text-align: center;">Abstract</h2>
 
     <p>
-    In this project, we created a framework for rendering a dynamic 3D voxel grid (32x32x32 or 64x64x64) in real-time using a 3D neural cellular automata model, which simulates the evolution of a grid of cells over time where each cell's state is influenced by its neighbors. For our pipeline, we first convert an input colored triangle mesh into a 3D voxel representation and train a 3D convolutional neural network that learns to create and regenerate this voxel representation from a minimal or damaged voxel grid. The model architecture includes [TODO]. The final trained model is visualized with a custom interactive renderer built with <code>Vispy</code> that allows for real-time rendering of the model output and supports user destruction of the voxel grid to simulate damage and regeneration. Prior work in this area has focused on 2D cellular automata or static 3D voxel grids, and our work extends this to 3D cellular automata with a focus on real-time rendering and dynamic user interaction. 
+
+    Neural Cellular Automata (NCA) is a powerful framework for simulating the evolution of cellular structures over time where each cell's state is directly influenced by its neighbors, and it has been used in various applications such as image generation, texture synthesis, and even physics and biology simulations. However, most existing work in this area has focused on 2D cellular automata or static 3D voxel grids with limited user interaction. In this project, we aim to extend the NCA framework to 3D voxel grids and create a real-time rendering pipeline that allows for dynamic user destruction of the voxel grid. We first convert an input colored triangle mesh into a 3D voxel representation and train a 3D convolutional neural network that learns to create and regenerate this voxel representation from a minimal or damaged voxel grid. The model architecture includes <b>[TODO]</b>. The final trained model is visualized with a custom interactive renderer built with <code>Vispy</code> that allows for real-time rendering of the model output and supports user destruction of the voxel grid with the mouse cursor in order to simulate damage and regeneration. 
     </p>
     
     <h2 style="text-align: center;">Technical Approach</h2>
 
     <div style="text-align: center;">
-      <img src="images/pipeline-logo.gif" alt="Pipeline GIF" style="display: block; margin: auto;" width="900" style="object-fit: cover; object-position: top; clip-path: inset(0px 0px 5px 0px);">
+      <img src="images/pipeline-logo.gif" alt="Pipeline GIF" width="800">
     </div>
     <br>
 
       <h3>1. 3D mesh to 3D Voxel Pipeline</h3>
-        We used the <a href="https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">GREYC 3D colored mesh dataset</a> which contains 15 different .PLY files. Each vertex of a mesh is represented by 3 coordinates(x,y,z) and its RGB(r,g,b).
+      <p class="small">
+        We used the <a href="https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">GREYC 3D colored mesh dataset</a> which contains 15 different .PLY files. Each vertex of a mesh is represented by 3 coordinates(x,y,z) and its RGB(r,g,b). Here's an example of a few objects included in the dataset, but we chose to work with the Mario, Mario Kart, and Duck meshes. 
+      </p>
       <br><br>
         <img src="images/3d_database_img.png" alt="3d database img" style="display: block; margin: auto;" width="400">
       <br>
-      
-      Since our model works over a voxel grid, we wrote a script that would convert the 3D mesh into voxels, and then to .NPY files to use as inputs to our neural network. The voxelization process is done by first normalizing the triangle mesh to voxel grid space to fit within the given <code>resolution x resolution x resolution</code> voxel grid. We then create a blank 3D grid of voxels and then iterate through each triangle in the mesh. For each triangle, we calculate the voxel bounding box that contains the triangle, then loop through each voxel in the bounding box and use barycentric coordinates to check if the voxel center lies within the triangle. If it does, we assign the color of the voxel to be the color of that given triangle. To compare multiple triangles that map to the same voxel, we simply select the largest triangle that the voxel center lies in to be the color of the voxel. Here's an example below.
-      <br><br>
+      <p class="small">
+        Since our neural network trains on voxel grids and not triangle meshes, we wrote a script to convert the colored 3D mesh into voxels stored in an .NPY file. The voxelization process starts by normalizing the triangle mesh into voxel grid space in order to fit within the given <code>resolution x resolution x resolution</code> voxel grid. We then create a blank 3D grid of voxels and then iterate through each triangle in the given mesh. For each triangle, we calculate the voxel bounding box that contains the triangle, then loop through each voxel in the bounding box and use barycentric coordinates to check if the voxel center lies within the triangle's vertices. If it does, we assign the color of the voxel to be the color of that given triangle. To compare multiple triangles that map to the same voxel, we simply select the color of the triangle with the largest area that the voxel center lies in to be the color of the voxel. Here's an example below of our voxelization:
+      </p>
       <div style="text-align:center;">
         <figure style="display:inline-block; margin:10px;"><img src="images/mario_mesh.png" width="150"><figcaption>3D Mesh Mario</figcaption></figure>
         <figure style="display:inline-block; margin:10px;"><img src="images/mario_env64.png" width="180"><figcaption>3D Voxelized Mario</figcaption></figure>
       </div>
+      <p class="small">
+      We also implemented a simple <code>FloodFill</code> algorithm to fill in the empty voxels inside the voxel object. The FloodFill algorithm starts at an exterior boundary voxel and uses BFS to find all the connected voxels that are not already filled (essentially finding the air outside the object). We then take the inverse of these "air" voxels and the filled voxels with <code>inside_filled = ~flood_fill & ~filled</code> to fill in the empty voxels inside the object, and we assign these inside voxels a flesh colored pink color of <code>(255, 200, 200)</code>. 
+      </p>
       <br>
       
 
       <h3>2. 3D Cellular Automata Neural Network</h3>
-      UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
-    The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
+      <p class="small">
+        UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
+        The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
         <br><br>
         Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
         higher-resolution voxels.
+      </p>
         <div style="text-align:center;">
           <figure style="display:inline-block;">
             <img src="images/mario_epochs_1000.gif" alt="Animated GIF" width="400">
@@ -110,16 +122,77 @@
         </div>
 
       <h3>3. Interactive Voxel Rendering and Model Evaluation</h3>
-      Once we have the model trained, we can visualize it with a custom interactive GUI built with <code>Vispy</code> and <code>PyQt</code>. <code>Vispy</code> is a high performance <code>Python</code> library powered by OpenGL for large 2D and 3D visualizations, so it was perfect for this project. It was also compatible with PyTorch and PyQt allowing us to integrate real-time model inference with a GUI. 
+      <p class="small">
+        Once the model has stabilized, we can visualize our NCA with a custom interactive GUI built with <code>VisPy</code> and <code>PyQt</code>. <code>Vispy</code> is a high-performance <code>Python</code> library powered by OpenGL, ideal for rendering large 2D and 3D visualizations like voxel grids. Its compatibility with <code>PyTorch</code> and <code>PyQt</code> made it well-suited for integrating real-time model inference with an interactive GUI. To get the interactive renderer working, we had to implement several key components, including voxel rendering, camera control, and mouse-based interaction: 
+      </p>
+      <ol>
+        <li><i>Rendering the voxel grid</i></li>
+        <ul>
+          <p class = "small">
+            <li>We first set up our <code>VisPy</code> canvas with a turntable camera to allow for interactive zooming and rotation. Next, we loaded our <code>PyTorch</code> model from the trained checkpoint set up a simulation function that would run model inference at every time step and outputs a 4D <code>NumPy</code> array of shape <code>(X,Y,Z,4)</code>.
+            <br><br>
+            <code>X,Y,Z</code> represents the spatial dimensions of the voxel grid and <code>4</code> represents the colors channels <code>R,G,B,A</code> where <code>A</code> is the alpha channel to determine the opacity of the color. To determine which voxels were "alive" at each time step, we used a simple thresholding method to determine whether the alpha channel of each voxel was above a certain "alive threshold" value, and only grabbed the <code>R,G,B</code> colors of the alive voxels. </li>
+          <br>
+          
+          <li>Once we had the coordinates and colors of the alive voxels, we originally tried rendering the grid as a point cloud using the built-in <code>Markers</code> library. Although it was simple and easy to implement, the point cloud wasn't up to par with the desired rendering quality as pictured below:</li>
 
-      <enumerate>
-        <li>rendering the voxel grid as a mesh</li>
-        <li>modifying camera setup and lighting and coloring</li>
-        <li>how to transform cursor space to 3d voxel space</li>
-        <li>handle ray intersections with the voxel grid</li>
-        <li>adding voxel grid damage</li>
-        <li>handling changing between different models</li>
-      <br><br>
+          <br><br>
+            <figure style="display: block; margin: auto; text-align: center;">
+              <img src="images/pointcloud.gif" alt="Markers" style="display: block; margin: auto;" width="250">
+              <figcaption>Initial Point Cloud Attempt</figcaption>
+            </figure>
+          <br><br>
+          <li>Next, we tried rendering each indiviudal voxel as a <code>Box</code> object, but rendering \(32^3\) individual cubes created a lot of lag. To improve the rendering speed, we decided to batch all the voxels together into a "mesh" and use the <code>MeshVisual</code> library and update the mesh data at each time step. This allowed us to create a very fast and visually appealing rendering (local on the CPU) while still maintaining the cube look, as shown below: </li>
+          </p>
+            <figure style="display: block; margin: auto; text-align: center;">
+              <img src="images/mesh.gif" alt="MeshVisual" style="display: block; margin: auto;" width="250">
+              <figcaption>Rendering with a mesh</figcaption>
+            </figure>
+
+          <p class = "small">
+            <li>We removed shading on the mesh voxel object in order to ensure all faces of the object were uniformally lit. This caused the coloring of some voxels to look overly saturated, so we dialed down the saturation by converting the RGB colors to HSV, reducing the saturation, and converting back to RGB.</li>
+          </p>
+        </ul>
+
+        <li><i>Transforming cursor clicks to 3D space</i></li>
+          <ul>
+            <p class = "small">
+              <li>After handling basic rendering of the NCA model, the next step was to add user interaction with the grid through clicking. The goal was to transform a 2D cursor click into a ray in 3D space, but this was complicated by the interactive camera. However, we were able to use the built-in <code>view.scene.transform</code> object, which represents the current mapping between scene and screen coordinates in <code>VisPy</code>, and leveraged the inverse transformation <code>view.scene.transform.imap</code> matrix to transform points from the screen to world. 
+              <br><br>
+              To apply this transformation, we first get the <code>(x,y)</code> mouse position in screen coordinates and create two homogeneous coordinates to represent a near point and a far point on the viewing z-axis where 0 = near and 1 = far. 
+              \[p_{near} = (x,y,0,1), p_{far} = (x,y,1,1)\]
+              We apply the <code>imap</code> inverse transformation to both points to get the 3D coordinates of the near and far points in world coordinates, and set the ray origin to be the near point and the direction to be the normalized difference between the far and near points.
+              \[ray_{origin} = imap(p_{near}[:3]), ray_{direction} = \frac{imap(p_{far}[:3]) - imap(p_{near}[:3])}{|imap(p_{far}[:3]) - imap(p_{near}[:3])|}\]
+              We tested our transformation by drawing the resulting ray in 3D space, and it correctly aligned with our mouse clicks.
+              <figcaption style="display: block; margin: auto; text-align: center;">
+                <img src="images/draw_ray.jpg" alt="Ray Casting" style="display: block; margin: auto;" width="250">
+                <figcaption>Testing Ray Casting from cursor</figcaption>
+            </p>
+          </ul>
+
+        <li><i>Handle ray intersections with the voxel grid and damaging the voxel grid</i></li>
+          <ul>
+            <p class = "small">
+              <li>To handle ray intersections with the voxel grid, we used a simple ray-casting algorithm to check for intersections between the ray and the voxel grid. Given the direction and origin of the mouse click ray, we iterate through all alive voxels, compute the voxel center, project that voxel center onto the ray, and measure the shortest distance from the voxel center to the ray using the ray equation described in lecture. 
+              \[p(t) = ray_{origin} + t \cdot ray_{direction}\] 
+
+              If the distance is within a threshold radius of the voxel center, we consider that voxel to be "hit" by the ray, and we take the closest of the hit voxels to be destroyed. Destruction is handled by zeroing out the voxel grid and living mask for the 6x6x6 cube of voxels around the hit voxel, which erases all features within that region. This allows us to visualize how the NCA model regenerates the voxel grid in the destroyed region. Destruction mode is enabled by holding down the "d" key, which also disables the camera controls. We also implemented support for click and drag to destroy multiple voxels at once by keeping track of mouse movement and checking for intersections with the ray at each time step.
+              </li>
+
+              <figcaption style="display: block; margin: auto; text-align: center;">
+                <img src="images/duck_destroy.gif" alt="Voxel Damage" style="display: block; margin: auto;" width="250">
+                <figcaption>Example of Voxel Damage and Regeneration</figcaption>
+            </p>
+          </ul>
+
+        <li><i>User experience</i></li>
+          <ul>
+            <p class = "small">
+              <li>We also added various buttons with <code>PyQt</code> to improve the user experience of the interactive renderer. We added a button to toggle between different models to visualize different objects at different resolutions, and also added a play, pause, and reset button to control the simulation. The play button starts the simulation and runs the model inference at each time step, while the pause button stops the simulation and allows the user to interact with the voxel grid. The reset button resets the voxel grid to its original state and stops the simulation.</li>
+            </p>
+          </ul>
+      </ol>
+      <br>
 
     <h2 style="text-align: center;">Results</h2>
 
@@ -127,16 +200,21 @@
     <br>
 
     <h2 style="text-align: center;">References</h2>
-
-    TODO
+      <ul>
+        <li><a href = "https://downloads.greyc.fr/Greyc3DColoredMeshDatabase/">GREYC Colored 3D Mesh Dataset</a></li>
+			  <li><a href="https://distill.pub/2020/growing-ca/#experiment-3">2D Growing Neural Cellular Automata (distill.pub/2020/growing-ca/#experiment-3)</a></li>
+			  <li><a href="https://github.com/Aadityaza/3d-Growing-neural-cellular-automata">3D Growing Neural Cellular Automata</a></li>
+			  <li><a href="https://meshnca.github.io/">Mesh Neural Cellular Automata</a></li>
+			  <li><a href="https://wandb.ai/johnowhitaker/nca/reports/Fun-With-Neural-Cellular-Automata--VmlldzoyMDQ5Mjg0">Fun with Neural Cellular Automata</a></li>
+			  <li><a href="https://greydanus.github.io/2022/05/24/studying-growth/">Studying Growth with Neural Cellular Automata</a></li>
+			  <li><a href="https://playgameoflife.com/">Conway's Game of Life</a></li>
+			  <li><a href="https://arxiv.org/pdf/2103.08737">Growing 3D Artefacts and Functional Machines with Neural Cellular Automata</a></li>
+		  </ul>
     <br>
 
     <h2>Contributions</h2>
-    TODO
-    <br>
-
     <enumerate>
-      <li>Annabel Ng: 3D mesh to 3D voxel pipeline, interactive voxel rendering </li>
+      <li>Annabel Ng: Developed the 3D mesh to 3D voxel pipeline as well as the interactive voxel rendering</li>
       <li>George Rickus: Model training</li>
       <li>Henry Ko: 3D mesh to 3D voxel pipeline, model training</li>
       <li>Samarth Jajoo: Model training</li>

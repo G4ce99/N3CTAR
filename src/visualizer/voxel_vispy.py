@@ -21,7 +21,7 @@ batch_size = 8
 input_channels = 16
 learn_seed = True
 seed_std = 0.05
-update_prob = 0.9 # 0.75
+update_prob = 1 # 0.75
 over_to_under_penalty = 1
 
 epochs = 1000

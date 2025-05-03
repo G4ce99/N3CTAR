@@ -1,28 +1,26 @@
 from PyQt5 import QtWidgets, QtCore
-from vispy import app, scene
-import torch
-import numpy as np
+from PyQt5.QtWidgets import QComboBox, QVBoxLayout, QWidget, QMainWindow, QHBoxLayout
+
+import os
 import sys
+import torch
+import signal
+import numpy as np
+from vispy import app, scene
 from vispy.color import Color
 from vispy.geometry import create_box
-from vispy.scene.visuals import Mesh
+from vispy.scene.visuals import Mesh, Line
 from vispy.scene import SceneCanvas
 from vispy.scene.events import SceneMouseEvent
-import signal
-from vispy.scene.visuals import Line
 from vispy.scene.cameras import TurntableCamera
-import os
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+from vispy.app import use_app
+use_app('pyqt5')
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from nca_model.NCA_hidden_LayerNorm import NCA
 
-#from nca_model.NCA import NCA
-
-
-# ==== Model + Setup ====
-model_name = "final_mario_focused_lin_damage5_p06_1-1_6000"
-ckpt_path = f"../ckpts/{model_name}.pth"
+# ==== Constants ====
 env_dim = 32
 n_channels = 16
 batch_size = 8
@@ -37,8 +35,11 @@ min_iter, max_iter = 48, 64 # 96, 128
 learning_rate = 2e-4
 weight_decay = 0
 alive_thres = 0.1
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ==== Model + Setup ====
+model_name = "final_mario_focused_lin_damage5_p06_1-1_6000"
+ckpt_path = f"../ckpts/{model_name}.pth"
 
 model = NCA(input_channels, 
             env_dim, 
@@ -56,11 +57,83 @@ print(x)
 living_mask = (x[:,3:4] > model.alive_thres).float()
 eval_iter = 0
 
+#==== PyQt Setup ====
+
+# create a model switcher class for a dropdown menu
+class ModelSwitcher(QWidget):
+    def __init__(self, visualizer):
+        super().__init__()
+        self.visualizer = visualizer
+        self.dropdown = QComboBox(self)
+        self.dropdown.addItems(["Mario 32x32x32", "Duck 32x32x32", "Bald Mario"])
+        self.dropdown.currentIndexChanged.connect(self.on_model_change)
+        self.layout = QVBoxLayout(self)
+        self.layout.addWidget(self.dropdown)
+        self.setLayout(self.layout)
+
+    def load_model(self, model_name, ckpt_path):
+        # load the model from the model name and checkpoint path 
+        model = NCA(input_channels, 
+                    env_dim, 
+                    learn_seed=learn_seed, 
+                    update_prob=update_prob, 
+                    alive_thres=alive_thres, 
+                    overgrowth_to_undergrowth_penalty=over_to_under_penalty)
+        model.to(device)
+        model.load_state_dict(torch.load(ckpt_path, map_location=device), strict=False)
+        model.eval()
+
+        x = model.seed.unsqueeze(0)
+        living_mask = (x[:,3:4] > model.alive_thres).float()
+        eval_iter = 0
+
+        return model, x, living_mask, eval_iter
+
+    def on_model_change(self, index):
+        # 32x32x32 mario
+        if index == 0:
+            model_name = 'final_mario_focused_lin_damage5_p06_1-1_6000'
+            ckpt_path = f"../ckpts/{model_name}.pth"
+
+            self.visualizer.model, self.visualizer.x, self.visualizer.living_mask, self.visualizer.eval_iter = self.load_model(model_name, ckpt_path)
+            # reset the model
+            self.visualizer.reset_simulation()
+            self.visualizer.update_visual(torch.clamp(self.visualizer.x[0, :4], 0., 1.))
+            self.visualizer.setWindowTitle("NCA Viewer - Mario 32x32x32")
+        # 32x32x32 duck
+        elif index == 1:
+            model_name = 'final_duck5_lin_damage5_up1_dp04_1-1_4000'
+            ckpt_path = f"../ckpts/{model_name}.pth"
+
+            self.visualizer.model, self.visualizer.x, self.visualizer.living_mask, self.visualizer.eval_iter = self.load_model(model_name, ckpt_path)
+            # reset the model
+            self.visualizer.reset_simulation()
+            self.visualizer.update_visual(torch.clamp(self.visualizer.x[0, :4], 0., 1.))
+            self.visualizer.setWindowTitle("NCA Viewer - Duck 32x32x32")
+
+        # 32x32x32 bald mario
+        elif index == 2:
+            model_name = 'mario_curriculum4_ln_damage_4-12_over10'
+            ckpt_path = f"../ckpts/{model_name}.pth"
+
+            self.visualizer.model, self.visualizer.x, self.visualizer.living_mask, self.visualizer.eval_iter = self.load_model(model_name, ckpt_path)
+            # reset the model
+            self.visualizer.reset_simulation()
+            self.visualizer.update_visual(torch.clamp(self.visualizer.x[0, :4], 0., 1.))
+            self.visualizer.setWindowTitle("NCA Viewer - Bald Mario")
+
+
 # ==== PyQt Main Window ====
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, model, x, living_mask, eval_iter):
         super().__init__()
         self.setWindowTitle("NCA Viewer")
+
+        # set global variables 
+        self.model = model
+        self.x = x
+        self.living_mask = living_mask
+        self.eval_iter = eval_iter
 
         # Central widget: split canvas and buttons
         central_widget = QtWidgets.QWidget()
@@ -70,42 +143,43 @@ class MainWindow(QtWidgets.QMainWindow):
         # VisPy canvas
         self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='lightgray', parent=central_widget, size=(800, 600))
         layout.addWidget(self.canvas.native)
+        self.model_switcher = ModelSwitcher(self)
 
         # VisPy 3D setup
         self.view = self.canvas.central_widget.add_view()
         center = env_dim // 2
 
+        # camera setup 
         self.view.camera = scene.cameras.TurntableCamera()
-        #self.view.camera = DragBlockCamera(parent=self.view.scene)
-
         self.view.camera.center = (center, center, center)
         self.view.camera.set_range(x=(0, env_dim), y=(0, env_dim), z=(0, env_dim))
         self.view.camera.distance = 3 * env_dim
-        # self.scatter = scene.visuals.Markers(parent=self.view.scene)
-        # self.scatter.antialias = 0
         self.mesh = None
-        #self.voxel_group = scene.Node(parent=self.view.scene)
 
-        # add mouse click 
+        # add mouse click events
         self.canvas.events.mouse_press.connect(self.on_mouse_press)
         self.canvas.events.mouse_move.connect(self.on_mouse_move)
         self.canvas.events.mouse_release.connect(self.on_mouse_release)
         self.canvas.events.key_press.connect(self.on_key_press)
         self.canvas.events.key_release.connect(self.on_key_release)
 
-        # Buttons
+
+        # Button layout to be horizontal bar on the bottom
         button_layout = QtWidgets.QHBoxLayout()
         layout.addLayout(button_layout)
-
+        
+        # Buttons
         self.play_button = QtWidgets.QPushButton("▶ Play")
         self.pause_button = QtWidgets.QPushButton("⏸ Pause")
         self.reset_button = QtWidgets.QPushButton("🔄 Reset")
         self.random_damage_button = QtWidgets.QPushButton("💥 Random Damage")
+        button_layout.addWidget(self.model_switcher)
         button_layout.addWidget(self.play_button)
         button_layout.addWidget(self.pause_button)
         button_layout.addWidget(self.reset_button)
         button_layout.addWidget(self.random_damage_button)
 
+        # Button actions
         self.play_button.clicked.connect(self.start_simulation)
         self.pause_button.clicked.connect(self.stop_simulation)
         self.reset_button.clicked.connect(self.reset_simulation)
@@ -114,18 +188,19 @@ class MainWindow(QtWidgets.QMainWindow):
         # Timer for auto-update
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.step_model)
+
+        # set flags
         self.is_running = False
         self.is_dragging = False
         self.d_key_pressed = False
 
-        self.update_visual(torch.clamp(x[0, :4], 0., 1.))
+        self.update_visual(torch.clamp(self.x[0, :4], 0., 1.))
 
 
     def update_visual(self, voxels, highlight_voxel = None):
         rgba = voxels.permute(1, 2, 3, 0).detach().cpu().numpy()
-        alive = rgba[..., 3] > model.alive_thres
+        alive = rgba[..., 3] > self.model.alive_thres
         coords = np.argwhere(alive)
-        #print(coords)
         colors = rgba[alive][..., :3]
         colors = np.clip(colors, 0, 1)
 
@@ -195,7 +270,6 @@ class MainWindow(QtWidgets.QMainWindow):
         return origin, direction
     
     def fuzzy_voxel_hit(self, origin, direction, voxel_grid, voxel_size=1.0, radius=0.75):
-        global x, living_mask
         # grab voxel grid shape and alive voxels
         grid_shape = voxel_grid.shape
         alive_voxels = np.argwhere(voxel_grid)  # (N, 3)
@@ -229,8 +303,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     closest_t = t
                     best_hit = tuple(voxel)
 
-        x[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
-        living_mask[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
+        self.x[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
+        self.living_mask[:, :, best_hit[0]:best_hit[0]+6, best_hit[1]:best_hit[1]+6, best_hit[2]:best_hit[2]+6] = 0
 
         return best_hit
 
@@ -247,9 +321,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.draw_ray(self.view, origin, direction)
 
 
-        rgba = torch.clamp(x[0, :4], 0., 1.)  # (4, X, Y, Z)
+        rgba = torch.clamp(self.x[0, :4], 0., 1.)  # (4, X, Y, Z)
         alpha = rgba[3]
-        alive_mask = (alpha > model.alive_thres).cpu().numpy()
+        alive_mask = (alpha > self.model.alive_thres).cpu().numpy()
 
         hit_voxel = self.fuzzy_voxel_hit(origin, direction, alive_mask, voxel_size=1.0)
 
@@ -263,72 +337,75 @@ class MainWindow(QtWidgets.QMainWindow):
         if event.key == 'D':
             self.d_key_pressed = True
 
+    # check for destruction key release
     def on_key_release(self, event):
         if event.key == 'D':
             self.d_key_pressed = False
 
+    # check for mouse press
     def on_mouse_press(self, event):
+        # if key is d, start checking for ray intersections
         if self.d_key_pressed:
             self.view.camera.interactive = False
             self.is_dragging = True
             self.handle_ray_hit(event)
 
-    
+    # handle click and drag with destruction
     def on_mouse_move(self, event):
         if self.is_dragging and self.d_key_pressed:
             self.handle_ray_hit(event)
               
-        
+    # handle mouse release with dragging for destruction
     def on_mouse_release(self, event):
         if self.is_dragging and self.d_key_pressed:
             self.is_dragging = False
-            self.view.camera.interactive = True
+            self.d_key_pressed = False
+        self.view.camera.interactive = True
             
-            
-        
-        
+    # handle model steps 
     def step_model(self):
-        global x, living_mask, eval_iter
         try:
             with torch.no_grad():
-                x, living_mask = model(x, living_mask)
-                eval_iter += 1
-                self.update_visual(torch.clamp(x[0, :4], 0., 1.))
-                self.setWindowTitle(f"NCA Viewer - Iteration {eval_iter}")
+                self.x, self.living_mask = self.model(self.x, self.living_mask)
+                self.eval_iter += 1
+                self.update_visual(torch.clamp(self.x[0, :4], 0., 1.))
+                self.setWindowTitle(f"NCA Viewer - Iteration {self.eval_iter}")
         except Exception as e:
             print(f"⚠️ Error in step_model: {e}")
             self.stop_simulation()  # Stop the simulation to prevent further errors
             clean_exit()  # Call the cleanup function
+
+    # start the simulation
     def start_simulation(self):
         if not self.is_running:
             self.timer.start(100)  # ms per step
             self.is_running = True
 
+    # stop the simulation
     def stop_simulation(self):
         if self.is_running:
             self.timer.stop()
             self.is_running = False
 
+    # 
     def reset_simulation(self):
-        global x, living_mask, eval_iter
-        x = model.get_seed().unsqueeze(0)
-        living_mask = (x[:,3:4] > model.alive_thres).float()
+        self.x = self.model.get_seed().unsqueeze(0)
+        self.living_mask = (self.x[:,3:4] > self.model.alive_thres).float()
 
-        eval_iter = 0
-        self.update_visual(torch.clamp(x[0, :4], 0., 1.))
+        self.eval_iter = 0
+        self.update_visual(torch.clamp(self.x[0, :4], 0., 1.))
         self.setWindowTitle("NCA Viewer - Reset")
 
     def random_damage(self):
-        global x, living_mask
         for i in range(np.random.randint(4, 12)):
             damage_x = np.random.randint(0, 26)
             damage_y = np.random.randint(0, 26)
             damage_z = np.random.randint(0, 26)
-            x[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
-            living_mask[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
+            self.x[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
+            self.living_mask[:, :, damage_x:damage_x+6, damage_y:damage_y+6, damage_z:damage_z+6] = 0
 
 
-# ==== Run the Qt app ====
+# ==== Run the Qt app ===== 
 if __name__ == '__main__':
     def clean_exit(*args):
         print("🧹 Cleaning up...")
@@ -342,7 +419,8 @@ if __name__ == '__main__':
     try:
         app.use_app('pyqt5')  # Use Qt backend
         qt_app = QtWidgets.QApplication(sys.argv)
-        window = MainWindow()
+        print(eval)
+        window = MainWindow(model, x, living_mask, eval_iter)
         window.show()
         qt_app.exec_()
     except Exception as e:

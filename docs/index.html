@@ -48,18 +48,18 @@
       <a href="https://github.com/G4ce99/N3CTAR" target="_blank" style="text-decoration: none;">
       <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
         <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub Logo" width="20" height="20">
-        GitHub Repo
+        tinyurl.com/n3ctarRepo
       </button>
       </a>
-      <a href="https://tinyurl.com/n3ctarVid" target="_blank" style="text-decoration: none;">
+      <a href="https://tinyurl.com/n3ctarVideo" target="_blank" style="text-decoration: none;">
       <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
         <img src="https://upload.wikimedia.org/wikipedia/commons/7/75/YouTube_social_white_squircle_%282017%29.svg" alt="Video Logo" width="20" height="20">
-        Watch Video
+        tinyurl.com/n3ctarVideo
       </button>
       </a>
       <a href="https://tinyurl.com/n3ctarSlides" target="_blank" style="text-decoration: none;">
         <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-          View Slides
+          tinyurl.com/n3ctarSlides
         </button>
       </a>
     </div>
@@ -112,7 +112,7 @@
         The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
         </p>
 			<p class="small">
-				Initially, we trained our model to learn to grow — it started with a single black voxel (hidden state learned), and we optimized it to be able to construct the full mesh within 16-64 iterations (number of iterations is sampled uniformly). The model learns to do this relatively quickly, but does not learn to maintain the mesh — within a few more iterations, the mesh often degenerates into chaos. So, in the next stage of training, we start from the mesh created by the model, and optimize it to be able to maintain the mesh — this way, the model learns to grow our mesh, and maintain it. Now for the most interesting part: we made our mesh resilient to damage. This stage of training consists of randomly corrupting portions of the mesh, and training our model to be able to reconstruct these portions, resulting in a dynamic, living 3D object. 
+				Initially, we trained our model to learn to grow — it started with a single black voxel (hidden state learned), and we optimized it to be able to construct the full mesh within 16-64 iterations (number of iterations is sampled uniformly). The model learns to do this relatively quickly, but does not learn to maintain the voxel grid — within a few more iterations, the voxel grid often degenerates into chaos. So, in the next stage of training, we start from the voxel grid created by the model, and optimize it to be able to maintain the voxel grid — this way, the model learns to grow our voxel grid, and maintain it. Now for the most interesting part: we made our voxel grid resilient to damage. This stage of training consists of randomly corrupting portions of the voxel grid, and training our model to be able to reconstruct these portions, resulting in a dynamic, living 3D object. 
 			</p>
 			<p class="small">
 				We built a curriculum to be able to manage all these learning tasks, while still preventing catastrophic forgetting: every curriculum would add 64 iterations to the last one. So, 0->64, 64->128... upto 1024. 
@@ -121,10 +121,28 @@
 			Our model's loss function consists of 3 factors: undergrowth, overgrowth, and stability. Stability is on a linear schedule, since we want the model to just learn to grow initially. (Weights: undergrowth at 1, overgrowth at 10, and stability from 0->10).
 		</p>      
         <div style="text-align:center;">
-          <figure style="display:inline-block;">
-            <img src="images/mario_epochs_1000.gif" alt="Animated GIF" width="400">
-            <figcaption>Preliminary Model Results</figcaption>
+          <table style="margin: 0 auto; text-align: center; border-collapse: collapse;">
+            <tr>
+              <td>
+          <figure>
+            <img src="images/mario_epochs_1000.gif" alt="Mario Epochs 1000" width="170">
+            <figcaption>Mario before stabilization (32x32x32)</figcaption>
           </figure>
+              </td>
+              <td>
+          <figure>
+            <img src="images/best_mario.gif" alt="Best Mario" width="200">
+            <figcaption>Best Mario after stabilization (32x32x32)</figcaption>
+          </figure>
+              </td>
+              <td>
+          <figure>
+            <img src="images/big_kart_results.gif" alt="Big Kart Results" width="200">
+            <figcaption>Big Mario Kart Results (64x64x64)</figcaption>
+          </figure>
+              </td>
+            </tr>
+          </table>
         </div>
 
       <h3>3. Interactive Voxel Rendering and Model Evaluation</h3>
@@ -152,11 +170,11 @@
           </p>
             <figure style="display: block; margin: auto; text-align: center;">
               <img src="images/mesh.gif" alt="MeshVisual" style="display: block; margin: auto;" width="250">
-              <figcaption>Rendering with a mesh</figcaption>
+              <figcaption>Rendering with the MeshVisual object</figcaption>
             </figure>
 
           <p class = "small">
-            <li>We removed shading on the mesh voxel object in order to ensure all faces of the object were uniformally lit. This caused the coloring of some voxels to look overly saturated, so we dialed down the saturation by converting the RGB colors to HSV, reducing the saturation, and converting back to RGB.</li>
+            <li>We removed shading on the <code>MeshVisual</code> voxel object in order to ensure all faces of the object were uniformally lit. This caused the coloring of some voxels to look overly saturated, so we dialed down the saturation by converting the RGB colors to HSV, reducing the saturation, and converting back to RGB.</li>
           </p>
         </ul>
 
@@ -239,7 +257,20 @@
                 <figcaption>Big Mario (64x64x64)</figcaption>
               </figure>
             </td>
-
+            <td>
+              <figure>
+                <img src="images/big_duck_results.gif" alt="Mario 64" width="400">
+                <figcaption>Big Duck (64x64x64)</figcaption>
+              </figure>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <figure>
+                <img src="images/big_kart_results.gif" alt="Mario 64" width="400">
+                <figcaption>Big Mario Kart (64x64x64)</figcaption>
+              </figure>
+            </td>
           </tr>
         </table>
       </div>
@@ -338,10 +369,10 @@
 
     <h2>Contributions</h2>
     <enumerate>
-      <li>Annabel Ng: Developed the 3D mesh to 3D voxel pipeline as well as the interactive voxel rendering</li>
-      <li>George Rickus: Model training</li>
-      <li>Henry Ko: 3D mesh to 3D voxel pipeline, model training</li>
-      <li>Samarth Jajoo: Model training</li>
+      <li><b>Annabel Ng</b>: Developed the 3D mesh to 3D voxel pipeline, debugged the flood fill algorithm, and implemented all of the interactive voxel rendering</li>
+      <li><b>George Rickus</b>: Focused on model training and figured out how to grow and maintain the voxel grid while also making the voxel grid resilient to damage</li>
+      <li><b>Henry Ko</b>: Debugged the 3D mesh to 3D voxel pipeline and focused on setting up GPU infrastructure for training all these models and experimented with quanitzation</li>
+      <li><b>Samarth Jajoo</b>: Focused on model training and supported George in figuring out how to stabilize the voxel grid</li>
     </enumerate>
 
 

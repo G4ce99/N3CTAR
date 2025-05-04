@@ -108,11 +108,14 @@
 
       <h3>2. 3D Cellular Automata Neural Network</h3>
       <p class="small">
-        UPDATE TODO: Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
+        Each voxel is built on 16 input channels: the first 4 are, in order, corresponding to RGBA values. The other 12 can be thought of as "hidden states" that convey information to their neighbours each update.  
         The model is built on three 3D-convolutions. The intuition behind the architecture is to first perceive from the sorroundings, and pool information from the 3x3x3 grid of neighbouring voxels. Next up, after a LayerNorm (for regularization purposes), we process the pooled information with layers with kernal size 1, eventually shrinking dimensionality to our desired output.
-        <br><br>
-        Training time takes around 10 minutes for a voxel grid size of 32x32x32 on a single A100 GPU. Preliminary results are below, but we will further stabilize training and optimize it so it can take
-        higher-resolution voxels.
+        
+				Initially, we trained our model to learn to grow — it started with a single black voxel (hidden state learned), and we optimized it to be able to construct the full mesh within 16-64 iterations (number of iterations is sampled uniformly). The model learns to do this relatively quickly, but does not learn to maintain the mesh — within a few more iterations, the mesh often degenerates into chaos. So, in the next stage of training, we start from the mesh created by the model, and optimize it to be able to maintain the mesh — this way, the model learns to grow our mesh, and maintain it. Now for the most interesting part: we made our mesh resilient to damage. This stage of training consists of randomly corrupting portions of the mesh, and training our model to be able to reconstruct these portions, resulting in a dynamic, living 3D object. 
+
+				We built a curriculum to be able to manage all these learning tasks, while still preventing catastrophic forgetting: every curriculum would add 64 iterations to the last one. So, 0->64, 64->128... upto 1024. 
+
+				Our model's loss function consists of 3 factors: undergrowth, overgrowth, and stability. Stability is on a linear schedule, since we want the model to just learn to grow initially. (Weights: undergrowth at 1, overgrowth at 10, and stability from 0->10).
       </p>
         <div style="text-align:center;">
           <figure style="display:inline-block;">

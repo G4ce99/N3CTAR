@@ -284,10 +284,36 @@
 					it could work with good generation accuracy. However, to our surprise, we realized the results were quite the oppsite: the model performance did not degrade after the quantization, but the inference speed decreased by a factor of approximately 3.61x.
 					A summary of our inference time per model forward pass in included in the table below. All numbers are an average of 100 forward passes, and measured in MacBook Pro with the M1 Pro Chip.
 					<br><br>
-					(ENTER TABLE)
-					baseline: 0.1840 sec
-					int8 quantization: 0.6515 sec
-					FP16 quantization: 
+					<table border="1" style="margin: auto; text-align: left; border-collapse: collapse;">
+						<caption style="caption-side: top; font-weight: bold; margin-bottom: 8px;">
+							Inference Time Comparison Across Precision Levels
+						</caption>
+						<thead>
+							<tr>
+								<th>Method</th>
+								<th>Time (ms)</th>
+								<th>Speedup vs. Baseline</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Baseline</td>
+								<td>184</td>
+								<td>1.0×</td>
+							</tr>
+							<tr>
+								<td>INT8 Quantization</td>
+								<td>651.5</td>
+								<td>0.28×</td>
+							</tr>
+							<tr>
+								<td>FP16 Quantization</td>
+								<td>42.8</td>
+								<td>4.29</td>
+							</tr>
+						</tbody>
+					</table>
+					
 					<br><br>
 					The direct reason behind why this happened is due to how Apple's M Series chips run FP32 and FP16 data types on their neural engine and GPUs, thus accelerating computations in such data formats, but fail to achieve similiar speedups for integer datatypes, despite
 					even using Int8 datatypes. However, one flip-side is that we did achieve approximately 55% reduction in memory usage. Although, theoretically Int8 quantization achieves 75% reduction in memory, caveats such as leaving certain layers like LayerNorm in FP32 format lead to an actual
@@ -297,7 +323,7 @@
 				<li><b>Post-Training FP16 Quantization</b></li>
 				<br>
 				<ul>The final approach we tried was running post-training quantization to FP16 instead of Int8. We expected this would accelerate computations by relying on Apple's Neural Engine and GPUs while maintaining manageable generation quality. However, when we ran the quantization to FP16, the model
-					quality was degraded. We expect the performance degradation coming from the quantization also being applied to the LayerNorm layer. The model inference speed was indeed faster, reaching speeds of 4.38x compared to our baseline. Here are some example outputs comparing all approaches below.
+					quality was degraded. We expect the performance degradation coming from the quantization also being applied to the LayerNorm layer. The model inference speed was indeed faster, reaching speeds of 4.29x compared to our baseline. Here are some example outputs comparing all approaches below.
 				</ul>
 				<br>
 				<div style="display: flex; justify-content: center; gap: 20px; text-align: center;">

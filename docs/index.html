@@ -238,6 +238,77 @@
         </table>
       </div>
 
+		<h3>4. Training Infrastructure and Quantization</h3>
+		<ol>
+			<li><b>GPU Infrastructure</b></li>
+			<br>
+			<ul>Our models are divided into two types: the 32x32x32 environment ones and the 64x64x64 environment ones. Most of
+				our initial experiments were done on 32x32x32 environment models and for these we used NVIDIA RTX 2080ti GPUs with 12GB of VRAM. Training on these
+				took up approximately 10GB of VRAM and we were able to extend it to multi-GPU training through Distributed Data Parallel(DDP). This allowed us to train 
+				faster on multiple GPUs, or train with larger batch sizes.
+				<br><br>
+				After reaching stable training on our 32x32x32 environments, we decided to scale up to 64x64x64 using NVIDIA H100 GPUs. We realized even with 80GB of VRAM, this large environment was reaching approximately
+				70GB of VRAM. Therefore, we decided to explore options for efficiently scaling our training runs.
+			 </ul>
+			 <br>
+			 <li><b>Half Precision Training</b></li>
+			 <br>
+			 <ul>Until now, we were running all training runs on full precision(FP32). Inspired by LLMs being frequently trained on half-precision(FP16) formats,
+				we decided to try this out with our models, especially when running our larger models. We achieved this through PyTorch's Automatic Mixed Precision framework, with special layers like LayerNorm not being quantized down
+				since it was specially sensitive to precision.
+				<br><br>
+				Although we got half precision training going, with an increased throughput of 1.4x, the model training was suffering serverly from overblowing NaNs. Though we tried mitigations such as reducing learning rates by two order of magnitudes, 
+				running hyperparameter sweeps, or incorporating gradient clipping, avoiding NaNs blowing up was difficult to achieve. Even though we had some good runs where NaNs were avoided, the training was highly unstable when the model entered the curicculum learning phase. Here's an example loss curve below.
+				<br><br>
+				<div style="display: flex; justify-content: center; gap: 20px; text-align: center;">
+					<figure style="width: 45%;">
+						<img src="images/bad_fp16_trainlog.png" style="width: 100%;">
+						<figcaption>FP16 Training Log</figcaption>
+					</figure>
+					<figure style="width: 45%;">
+						<img src="images/64-fp16_2x.gif" style="width: 100%;">
+						<figcaption>FP16 Output Visualization</figcaption>
+					</figure>
+				</div>				</ul>
+				<br>
+				<li><b>Post-Training Int8 Quantization</b></li>
+				<br>
+				<ul>Next on our list was deciding to go with full precision for training, but quantizating down the model after all the training was finished.
+					Our goal was to have a live demo using our MacBooks as target hardware. We thought that quantizing the model weights down to Int8 would be incredibly fast and memory-efficient to run, given that 
+					it could work with good generation accuracy. However, to our surprise, we realized the results were quite the oppsite: the model performance did not degrade after the quantization, but the inference speed decreased by a factor of approximately 3.61x.
+					A summary of our inference time per model forward pass in included in the table below. All numbers are an average of 100 forward passes, and measured in MacBook Pro with the M1 Pro Chip.
+					<br><br>
+					(ENTER TABLE)
+					baseline: 0.1840 sec
+					int8 quantization: 0.6515 sec
+					FP16 quantization: 
+					<br><br>
+					The direct reason behind why this happened is due to how Apple's M Series chips run FP32 and FP16 data types on their neural engine and GPUs, thus accelerating computations in such data formats, but fail to achieve similiar speedups for integer datatypes, despite
+					even using Int8 datatypes. However, one flip-side is that we did achieve approximately 55% reduction in memory usage. Although, theoretically Int8 quantization achieves 75% reduction in memory, caveats such as leaving certain layers like LayerNorm in FP32 format lead to an actual
+					of less than 75%.
+				</ul>
+				<br>
+				<li><b>Post-Training FP16 Quantization</b></li>
+				<br>
+				<ul>The final approach we tried was running post-training quantization to FP16 instead of Int8. We expected this would accelerate computations by relying on Apple's Neural Engine and GPUs while maintaining manageable generation quality. However, when we ran the quantization to FP16, the model
+					quality was degraded. We expect the performance degradation coming from the quantization also being applied to the LayerNorm layer. The model inference speed was indeed faster, reaching speeds of 4.38x compared to our baseline. Here are some example outputs comparing all approaches below.
+				</ul>
+				<br>
+				<div style="display: flex; justify-content: center; gap: 20px; text-align: center;">
+					<figure style="width: 30%;">
+						<img src="images/mario64-fp32_2x.gif" style="width: 100%;">
+						<figcaption>FP32</figcaption>
+					</figure>
+					<figure style="width: 30%;">
+						<img src="images/mario-64-int8quantized_2x.gif" style="width: 100%;">
+						<figcaption>INT8 Quantized</figcaption>
+					</figure>
+					<figure style="width: 30%;">
+						<img src="images/64-fp16_2x.gif" style="width: 100%;">
+						<figcaption>FP16</figcaption>
+					</figure>
+				</div>
+		</ol>
 
     <b>insert model logs here </b>
     <br>
